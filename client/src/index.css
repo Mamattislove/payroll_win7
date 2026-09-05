@@ -1,1 +1,10 @@
 @import "tailwindcss";
+
+/* scripts/check-legacy-browsers.mjs names the utilities it refuses to let
+   through -- text-balance, transition-discrete, grid-cols-subgrid. Tailwind's
+   automatic content detection scans that file like any other, reads those
+   names as class candidates, and generates the exact post-Chrome-109 CSS the
+   check exists to keep out, failing the build on its own comments. The
+   directory holds build tooling, never markup, so nothing is lost by skipping
+   it. */
+@source not "../scripts";

@@ -8,6 +8,8 @@ import Login, { action as loginAction } from "./pages/Login";
 import DashboardLayout, {
     loader as dashboardLayoutLoader,
 } from "./pages/DashboardLayout";
+import ErrorPage from "./pages/ErrorPage";
+import NotFound from "./pages/NotFound";
 
 // Every dashboard page used to be statically imported into one ~2.2MB bundle,
 // so opening the login page downloaded the code for every other page too.
@@ -25,12 +27,16 @@ const router = createBrowserRouter([
     {
         path: "/",
         element: <HomeLayout />,
+        // Without this the router falls back to its own error screen, which
+        // shows a stack trace and nothing a clerk can act on.
+        errorElement: <ErrorPage />,
         children: [
             {
                 index: true,
                 loader: () => redirect("/login"),
             },
             { path: "login", element: <Login />, action: loginAction },
+            { path: "*", element: <NotFound /> },
         ],
     },
     {
@@ -38,6 +44,10 @@ const router = createBrowserRouter([
         path: "/dashboard",
         element: <DashboardLayout />,
         loader: dashboardLayoutLoader,
+        // /dashboard is a sibling of "/", not a child, so it needs its own
+        // boundary -- a page loader that throws would otherwise land on the
+        // router's default screen.
+        errorElement: <ErrorPage />,
         children: [
             { index: true, lazy: page(() => import("./pages/Dashboard")) },
             {
@@ -168,6 +178,9 @@ const router = createBrowserRouter([
                 path: "audit-logs",
                 lazy: page(() => import("./pages/AuditLogs")),
             },
+            // Matched last, so a mistyped dashboard address renders inside the
+            // layout with the sidebar still there rather than as a dead end.
+            { path: "*", element: <NotFound inDashboard /> },
         ],
     },
 ]);

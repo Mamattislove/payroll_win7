@@ -9,3 +9,4 @@ export { default as SelectField } from "./common/SelectField";
 export { default as InfoField } from "./common/InfoField";
 export { default as ConfirmModal, useConfirm } from "./common/ConfirmModal";
 export { default as Pagination } from "./common/Pagination";
+export { default as ErrorState } from "./common/ErrorState";

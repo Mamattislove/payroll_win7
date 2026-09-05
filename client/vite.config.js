@@ -38,14 +38,32 @@ export default defineConfig({
             targets: LEGACY_CSS_TARGET,
         },
     },
+    // build.target only applies to `vite build`. The dev server transforms
+    // source with Oxc, which defaults to `esnext` and lowers nothing, so
+    // `npm run dev` (what start-app.cmd runs, with --host, so Windows 7
+    // machines reach it over the LAN) would serve syntax Chrome 109 cannot
+    // parse. Pin it to the same ceiling as the build.
+    //
+    // Note Oxc skips plain `.js` by default (its exclude is /\.js$/), so the
+    // hand-written helpers in utils/ and ../utils/ are served as authored in
+    // dev. Keep those to syntax Chrome 109 already understands.
+    oxc: {
+        target: LEGACY_JS_TARGET,
+    },
     build: {
         target: LEGACY_JS_TARGET,
         cssMinify: "lightningcss",
     },
     optimizeDeps: {
         // Keep dev-mode prebundles within the same ceiling as the build.
-        esbuildOptions: {
-            target: LEGACY_JS_TARGET,
+        // This has to go through rolldownOptions: Vite 8 forwards only a few
+        // optimizeDeps.esbuildOptions fields (minify, define, loader, ...) to
+        // Rolldown, and `target` is not one of them -- setting it there is
+        // silently discarded.
+        rolldownOptions: {
+            transform: {
+                target: LEGACY_JS_TARGET,
+            },
         },
     },
     server: {
