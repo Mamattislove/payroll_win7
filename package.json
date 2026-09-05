@@ -1,0 +1,39 @@
+{
+    "name": "payroll",
+    "version": "1.0.0",
+    "type": "module",
+    "description": "MERN Payroll System",
+    "main": "server.js",
+    "engines": {
+        "node": ">=20.x"
+    },
+    "scripts": {
+        "start": "node server.js",
+        "build": "npm install && cd client && npm install --include=dev && npm run build",
+        "server": "nodemon server.js",
+        "client": "cd client && npm run dev",
+        "dev": "concurrently --kill-others-on-fail \"npm run server\" \"npm run client\""
+    },
+    "keywords": [],
+    "author": "",
+    "license": "ISC",
+    "dependencies": {
+        "bcryptjs": "^3.0.3",
+        "cookie-parser": "^1.4.7",
+        "dayjs": "^1.11.20",
+        "dotenv": "^17.4.2",
+        "express": "^4.22.1",
+        "express-async-errors": "^3.1.1",
+        "express-rate-limit": "^8.7.0",
+        "express-validator": "^7.3.2",
+        "http-status-codes": "^2.3.0",
+        "jsonwebtoken": "^9.0.3",
+        "mongoose": "^9.6.2",
+        "morgan": "^1.10.1",
+        "multer": "^2.1.1"
+    },
+    "devDependencies": {
+        "concurrently": "^9.2.1",
+        "nodemon": "^3.1.0"
+    }
+}

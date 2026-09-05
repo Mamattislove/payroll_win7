@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <link rel="icon" type="image/svg+xml" href="./src/assets/favicon.ico" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>client</title>
+    </head>
+    <body>
+        <div id="root"></div>
+        <script type="module" src="/src/main.jsx"></script>
+        <!--
+            Browsers without ES module support (Internet Explorer 11, which is
+            what Windows 7 ships with) silently ignore the script above and show
+            a blank page. They do run `nomodule` scripts, so use ES5 here to
+            explain what happened instead. Styles are inline because IE cannot
+            parse the custom properties the stylesheet is built on.
+        -->
+        <script nomodule>
+            document.getElementById("root").innerHTML =
+                '<div style="font:16px/1.6 Segoe UI,Tahoma,sans-serif;color:#1e293b;max-width:34em;margin:12vh auto;padding:0 24px">' +
+                '<h1 style="font-size:22px;margin:0 0 12px">This browser is too old</h1>' +
+                "<p>The payroll system needs a browser released after 2017. Internet Explorer cannot run it.</p>" +
+                "<p>On Windows 7, install one of these instead:</p>" +
+                '<ul><li>Google Chrome 109</li><li>Microsoft Edge 109</li><li>Mozilla Firefox 115 ESR</li></ul>' +
+                "<p>These are the final versions released for Windows 7, and the system is tested against them.</p>" +
+                "</div>";
+        </script>
+    </body>
+</html>

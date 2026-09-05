@@ -1,0 +1,63 @@
+employee,employee_code,client,compensation_daily_rate,implied_rates_in_attendance,distinct_rates,affected_days,first_date,last_date,total_drift,direction,verdict
+"COSTA, GLENN ALFRED",Z-4164,UBLC,649.2,525,1,49,2026-06-01,2026-07-31,-6085.8,paid below rate,one alternate rate - likely a rate change
+"MOLINA, ERWIN",Z-3852,UBLC,649.2,556.3,1,51,2026-06-01,2026-07-31,-4737.9,paid below rate,one alternate rate - likely a rate change
+"LOREN, MANOLITO",D-3587,"TAGAYTAY POULTRY BREEDERS, INC.",635.25,525 | 577.5,2,40,2026-07-16,2026-08-31,-3517.5,paid below rate,REVIEW - several rates in one span
+"DIMAANO, NOEMI",D-3236,"TAGAYTAY POULTRY BREEDERS, INC.",693,525,1,12,2026-08-01,2026-08-15,-2016,paid below rate,one alternate rate - likely a rate change
+"SARMIENTO, MYRA",D-3270,"TAGAYTAY POULTRY BREEDERS, INC.",611.93,537.08 | 540.61,2,27,2026-07-16,2026-08-15,-1971.53,paid below rate,REVIEW - several rates in one span
+"ROLLO, ROSELINE",D-3266,"TAGAYTAY POULTRY BREEDERS, INC.",611.93,525 | 540.61,2,24,2026-07-16,2026-08-15,-1899,paid below rate,REVIEW - several rates in one span
+"ERSANDO, ARCELI",Z-3301,UBLC,667.56,525,1,13,2026-08-01,2026-08-14,-1853.28,paid below rate,one alternate rate - likely a rate change
+"GALARCE, LARRA MAE",Z-3304,UBLC,624.17,525 | 600,2,27,2026-07-16,2026-08-15,-1702.59,paid below rate,REVIEW - several rates in one span
+"MASICAP, HECTOR",D-3253,"TAGAYTAY POULTRY BREEDERS, INC.",635.25,577.5 | 611.93,2,40,2026-07-16,2026-08-31,-1552.54,paid below rate,REVIEW - several rates in one span
+"OLEO, LODIEBINA",Z-3316,UBLC,667.56,556.3,1,12,2026-08-01,2026-08-15,-1335.12,paid below rate,one alternate rate - likely a rate change
+"MARTINEZ, EDWIN",D-3251,"TAGAYTAY POULTRY BREEDERS, INC.",693,525 | 611.93,2,15,2026-07-24,2026-08-31,-1302.98,paid below rate,REVIEW - several rates in one span
+"SISANTE, GEMIEMA",D-3271,"TAGAYTAY POULTRY BREEDERS, INC.",693,611.93,1,14,2026-08-01,2026-08-15,-1134.98,paid below rate,one alternate rate - likely a rate change
+"DE TORRES, JONATHAN",Z-3294,UBLC,611.93,525,1,13,2026-08-01,2026-08-15,-1130.09,paid below rate,one alternate rate - likely a rate change
+"GODOY, MELODY",D-3244,"TAGAYTAY POULTRY BREEDERS, INC.",611.93,525,1,13,2026-08-01,2026-08-15,-1130.09,paid below rate,one alternate rate - likely a rate change
+"TIAGA, ANGELA",D-3275,"TAGAYTAY POULTRY BREEDERS, INC.",611.93,525,1,13,2026-08-01,2026-08-15,-1130.09,paid below rate,one alternate rate - likely a rate change
+"COSTA, CAMILLE LOUSIANA",D-3914,"TAGAYTAY POULTRY BREEDERS, INC.",635.25,525,1,10,2026-08-01,2026-08-15,-1102.5,paid below rate,one alternate rate - likely a rate change
+"CUENO, MARITES",D-3232,"TAGAYTAY POULTRY BREEDERS, INC.",611.93,525,1,12,2026-08-02,2026-08-15,-1043.16,paid below rate,one alternate rate - likely a rate change
+"ESPINAR, SUSAN",D-3238,"TAGAYTAY POULTRY BREEDERS, INC.",611.93,525,1,12,2026-08-01,2026-08-15,-1043.16,paid below rate,one alternate rate - likely a rate change
+"MONTENEGRO, SARA JEAN",D-3258,"TAGAYTAY POULTRY BREEDERS, INC.",611.93,540.61,1,14,2026-08-16,2026-08-31,-998.48,paid below rate,one alternate rate - likely a rate change
+"MONTEZA, THERESA",Z-3314,UBLC,630.29,556.3,1,13,2026-08-01,2026-08-15,-961.87,paid below rate,one alternate rate - likely a rate change
+"PERIDO, JIMMY",Z-3320,UBLC,577.5,525,1,12,2026-08-02,2026-08-15,-630,paid below rate,one alternate rate - likely a rate change
+"VILLA, JAYSON",Z-3328,UBLC,577.5,525,1,12,2026-08-01,2026-08-15,-630,paid below rate,one alternate rate - likely a rate change
+"MAGBANUA, RHEALEEN",D-4277,"TAGAYTAY POULTRY BREEDERS, INC.",577.5,525 | 635.25,2,13,2026-07-23,2026-08-15,-462,paid below rate,REVIEW - several rates in one span
+"MAYUGA, MICHELLE",Z-3349,UBLC,556.3,525,1,12,2026-08-02,2026-08-15,-375.6,paid below rate,one alternate rate - likely a rate change
+"RIVERA, SONNY",N-2645,ST. MARTIN OF TOURS CREDIT AND DEVELOPMENT COOPERATIVE,620,600,1,10,2026-08-03,2026-08-14,-200,paid below rate,one alternate rate - likely a rate change
+"SERVIDA, ROCHELLE",Z-4011,UBLC,530.12,525,1,12,2026-08-01,2026-08-15,-61.44,paid below rate,one alternate rate - likely a rate change
+"HUBAHIB, MA. JELYNA MADELINE",A-079,YAMAN NG LAHI LABOR SERVICE COOPERATIVE,639.69,635.46,1,11,2026-08-01,2026-08-15,-46.53,paid below rate,one alternate rate - likely a rate change
+"GONZALBO, REXCHAN",R-5235,MANCO NON-TOLLING,600,597,1,10,2026-07-21,2026-07-31,-30,paid below rate,one alternate rate - likely a rate change
+"LOPEZ, RYAN JAY",N-2351,ST. MARTIN OF TOURS CREDIT AND DEVELOPMENT COOPERATIVE,601,600,1,8,2026-08-03,2026-08-13,-8,paid below rate,one alternate rate - likely a rate change
+"VICTORINO, MARIO JR",N-2649,ST. MARTIN OF TOURS CREDIT AND DEVELOPMENT COOPERATIVE,601,600,1,8,2026-08-03,2026-08-14,-8,paid below rate,one alternate rate - likely a rate change
+"TRINIDAD, LESTER",N-4986,ST. MARTIN OF TOURS CREDIT AND DEVELOPMENT COOPERATIVE,600,601,1,5,2026-08-03,2026-08-12,5,paid above rate,one alternate rate - likely a rate change
+"TIMAJO, MICHAEL",Z-5042,UBLC,525,530.12,1,1,2026-08-01,2026-08-01,5.12,paid above rate,one alternate rate - likely a rate change
+"LONDOÑO, ROBERT",N-2636,ST. MARTIN OF TOURS CREDIT AND DEVELOPMENT COOPERATIVE,600,601,1,6,2026-08-03,2026-08-13,6,paid above rate,one alternate rate - likely a rate change
+"TORREON, CHRISTIAN",D-4665,"TAGAYTAY POULTRY BREEDERS, INC.",525,611.93,1,1,2026-08-02,2026-08-02,86.93,paid above rate,one alternate rate - likely a rate change
+"BENEDICTO, PRINCESS",N-4975,ST. MARTIN OF TOURS CREDIT AND DEVELOPMENT COOPERATIVE,600,620,1,6,2026-08-03,2026-08-13,120,paid above rate,one alternate rate - likely a rate change
+"MARTINEZ, NECITA",D-3252,"TAGAYTAY POULTRY BREEDERS, INC.",611.93,525 | 635.25 | 693,3,35,2026-07-16,2026-08-31,191.45,paid above rate,REVIEW - several rates in one span
+"SAQUIN, EMMA GRACE",D-5183,"TAGAYTAY POULTRY BREEDERS, INC.",525,540.61,1,13,2026-08-01,2026-08-14,202.93,paid above rate,one alternate rate - likely a rate change
+"ORATE, EDMEL",D-3259,"TAGAYTAY POULTRY BREEDERS, INC.",525,540.61,1,15,2026-08-01,2026-08-20,234.15,paid above rate,one alternate rate - likely a rate change
+"FABOR, MARLON JOHN",R-3772,MANCO NON-TOLLING,600,611.98,1,32,2026-06-01,2026-07-17,383.36,paid above rate,one alternate rate - likely a rate change
+"FABILE, MARISSA",D-4906,"TAGAYTAY POULTRY BREEDERS, INC.",525,611.93,1,5,2026-08-01,2026-08-05,434.65,paid above rate,one alternate rate - likely a rate change
+"MEDINA, ERISH",Z-4405,UBLC,525,556.3,1,14,2026-08-01,2026-08-15,438.2,paid above rate,one alternate rate - likely a rate change
+"SUGASTE, KRISTINE",D-3273,"TAGAYTAY POULTRY BREEDERS, INC.",537.08,611.93,1,6,2026-08-01,2026-08-15,449.1,paid above rate,one alternate rate - likely a rate change
+"PEÑA, KIMBERLY",D-4240,"TAGAYTAY POULTRY BREEDERS, INC.",540.61,525 | 611.93,2,35,2026-07-16,2026-08-31,496.81,paid above rate,REVIEW - several rates in one span
+"MOJICA, JOHN PAUL",D-5248,"TAGAYTAY POULTRY BREEDERS, INC.",525,577.5,1,11,2026-08-03,2026-08-14,577.5,paid above rate,one alternate rate - likely a rate change
+"VILLA, CLARK JERSON",Z-4236,UBLC,525,577.5,1,12,2026-08-02,2026-08-15,630,paid above rate,one alternate rate - likely a rate change
+"PERIDO, JESSA",Z-4551,UBLC,525,577.5,1,13,2026-08-01,2026-08-15,682.5,paid above rate,one alternate rate - likely a rate change
+"RAGASA, AISELY",T-5098,"TAGAYTAY POULTRY BREEDERS, INC.",525,611.93,1,8,2026-08-01,2026-08-14,695.44,paid above rate,one alternate rate - likely a rate change
+"LLENA, JIMMY",D-4562,"TAGAYTAY POULTRY BREEDERS, INC.",577.5,635.25,1,14,2026-08-16,2026-08-31,808.5,paid above rate,one alternate rate - likely a rate change
+"SANCHES, CHEENEE",D-4205,"TAGAYTAY POULTRY BREEDERS, INC.",540.61,525 | 611.93,2,24,2026-07-16,2026-08-14,842.38,paid above rate,REVIEW - several rates in one span
+"MORALES, CHRISTINE",D-3600,"TAGAYTAY POULTRY BREEDERS, INC.",540.61,611.93,1,13,2026-08-17,2026-08-31,927.16,paid above rate,one alternate rate - likely a rate change
+"GIGANTE, KATE ASHLEY",D-5096,"TAGAYTAY POULTRY BREEDERS, INC.",525,611.93,1,11,2026-08-03,2026-08-14,956.23,paid above rate,one alternate rate - likely a rate change
+"TAGUINOD, JOSEPHINE",D-3274,"TAGAYTAY POULTRY BREEDERS, INC.",611.93,693,1,13,2026-08-01,2026-08-15,1053.91,paid above rate,one alternate rate - likely a rate change
+"CRUZADA, ROXSAN",D-4104,"TAGAYTAY POULTRY BREEDERS, INC.",525,611.93 | 635.25,2,12,2026-08-02,2026-08-14,1066.48,paid above rate,REVIEW - several rates in one span
+"LEYBA, SEVERINO",D-3586,"TAGAYTAY POULTRY BREEDERS, INC.",525,611.93,1,13,2026-07-16,2026-07-31,1130.09,paid above rate,one alternate rate - likely a rate change
+"DE LEON, JIN JIN",Z-4207,UBLC,525,611.93,1,14,2026-08-01,2026-08-15,1217.02,paid above rate,one alternate rate - likely a rate change
+"MOJICA, AILYN",D-4422,"TAGAYTAY POULTRY BREEDERS, INC.",577.5,611.93 | 635.25,2,26,2026-07-16,2026-08-31,1221.66,paid above rate,REVIEW - several rates in one span
+"FALCUTILA, JHUNBEL",Z-3904,UBLC,525,624.17,1,14,2026-07-16,2026-07-31,1388.38,paid above rate,one alternate rate - likely a rate change
+"PENALES, MARK IAN",Z-3317,UBLC,556.3,667.56,1,13,2026-08-01,2026-08-15,1446.38,paid above rate,one alternate rate - likely a rate change
+"MARCELO, JOEBERT",D-3943,"TAGAYTAY POULTRY BREEDERS, INC.",525,577.5 | 611.93,2,22,2026-07-16,2026-08-15,1568.16,paid above rate,REVIEW - several rates in one span
+"MARTILLAN, MARK ANGELO",Z-5034,UBLC,525,667.56,1,11,2026-08-01,2026-08-14,1568.16,paid above rate,one alternate rate - likely a rate change
+"EMAAS, JOHN LEO",D-3830,"TAGAYTAY POULTRY BREEDERS, INC.",525,693,1,12,2026-08-01,2026-08-15,2016,paid above rate,one alternate rate - likely a rate change
+"LUCASAN, JUNILO",D-4944,"TAGAYTAY POULTRY BREEDERS, INC.",525,635.25,1,24,2026-07-17,2026-08-14,2646,paid above rate,one alternate rate - likely a rate change
