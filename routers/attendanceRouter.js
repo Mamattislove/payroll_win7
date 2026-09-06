@@ -22,7 +22,7 @@ router
     .route("/")
     .get(getAllAttendances)
     .post(
-        authorizePermission(USER_ROLES.HR),
+        authorizePermission(USER_ROLES.HR, USER_ROLES.ENCODER),
         validateAttendanceInput,
         createAttendance,
     );
@@ -30,7 +30,7 @@ router
 router
     .route("/bulk")
     .post(
-        authorizePermission(USER_ROLES.HR),
+        authorizePermission(USER_ROLES.HR, USER_ROLES.ENCODER),
         validateBulkAttendanceInput,
         bulkCreateAttendance,
     );
@@ -40,11 +40,14 @@ router
     .all(validateAttendanceParamId)
     .get(getAttendance)
     .patch(
-        authorizePermission(USER_ROLES.HR),
+        authorizePermission(USER_ROLES.HR, USER_ROLES.ENCODER),
         validateAttendanceUpdateInput,
         updateAttendance,
     )
-    .delete(authorizePermission(USER_ROLES.HR), deleteAttendance);
+    .delete(
+        authorizePermission(USER_ROLES.HR, USER_ROLES.ENCODER),
+        deleteAttendance,
+    );
 // router
 //     .route("/:attendanceId/compensations/:compensationId")
 //     .all(validateAttendanceParamId);

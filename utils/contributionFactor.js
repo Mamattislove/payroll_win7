@@ -5,18 +5,19 @@ import { PAYROLL_PERIODS } from "./constants.js";
  * however often payroll runs. This returns the share of the monthly amount a
  * single run should deduct, so the runs in a month add up to exactly 100%.
  *
- *   monthly        1     — the whole amount on the single run
- *   semi-monthly   0.5   — half on each of the two cutoffs
- *   weekly, daily  0.25  — a quarter on each of the first four runs of the
- *                          month, and nothing on a fifth
+ *   monthly              1     — the whole amount on the single run
+ *   semi-monthly, daily  0.5   — half on each of the two cutoffs
+ *   weekly               0.25  — a quarter on each of the first four runs of
+ *                                the month, and nothing on a fifth
  *
  * Why skip the fifth week rather than divide by the actual week count: dividing
  * by 4 or 5 makes the deduction change size between months, which employees
  * query every time they see it. A constant quarter with a skipped fifth week
  * keeps the payslip stable and still remits exactly the monthly amount.
  *
- * Daily-rated employees follow the weekly rule: "daily" describes how they are
- * rated, and their payroll is run weekly.
+ * Daily-rated employees take the semi-monthly share, not the weekly one:
+ * "daily" describes how they are rated, but their payroll runs on the same two
+ * cutoffs a month as everyone else, so half the monthly amount comes off each.
  *
  * @param {string} payrollPeriod - Compensation.payrollPeriod
  * @param {Date|string} payrollFrom - start of the pay period
@@ -28,10 +29,10 @@ export function contributionFactor(payrollPeriod, payrollFrom) {
             return 1;
 
         case PAYROLL_PERIODS.SEMI_MONTHLY:
+        case PAYROLL_PERIODS.DAILY:
             return 0.5;
 
-        case PAYROLL_PERIODS.WEEKLY:
-        case PAYROLL_PERIODS.DAILY: {
+        case PAYROLL_PERIODS.WEEKLY: {
             const day = new Date(payrollFrom).getUTCDate();
             // Days 1-7 are week 1, 8-14 week 2, 15-21 week 3, 22-28 week 4.
             // Anything from the 29th onward is a fifth week and is skipped.

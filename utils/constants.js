@@ -2,6 +2,7 @@
 export const USER_ROLES = {
     ADMIN: "admin",
     HR: "hr",
+    ENCODER: "encoder",
     VIEWER: "viewer",
     USER: "user",
 };
