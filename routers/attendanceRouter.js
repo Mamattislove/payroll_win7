@@ -14,7 +14,7 @@ import {
     validateAttendanceParamId,
 } from "../middlewares/modelMiddlewares/attendanceValidations.js";
 import { authorizePermission } from "../middlewares/authMiddleware.js";
-import { USER_ROLES } from "../utils/constants.js";
+import { WRITE_ROLES } from "../utils/permissions.js";
 
 const router = Router();
 
@@ -22,7 +22,7 @@ router
     .route("/")
     .get(getAllAttendances)
     .post(
-        authorizePermission(USER_ROLES.HR, USER_ROLES.ENCODER),
+        authorizePermission(...WRITE_ROLES.attendances),
         validateAttendanceInput,
         createAttendance,
     );
@@ -30,7 +30,7 @@ router
 router
     .route("/bulk")
     .post(
-        authorizePermission(USER_ROLES.HR, USER_ROLES.ENCODER),
+        authorizePermission(...WRITE_ROLES.attendances),
         validateBulkAttendanceInput,
         bulkCreateAttendance,
     );
@@ -40,12 +40,12 @@ router
     .all(validateAttendanceParamId)
     .get(getAttendance)
     .patch(
-        authorizePermission(USER_ROLES.HR, USER_ROLES.ENCODER),
+        authorizePermission(...WRITE_ROLES.attendances),
         validateAttendanceUpdateInput,
         updateAttendance,
     )
     .delete(
-        authorizePermission(USER_ROLES.HR, USER_ROLES.ENCODER),
+        authorizePermission(...WRITE_ROLES.attendances),
         deleteAttendance,
     );
 // router

@@ -7,18 +7,18 @@ import {
     validateAllowanceRecordInput, validateAllowanceRecordUpdateInput, validateAllowanceRecordParamId,
 } from "../middlewares/modelMiddlewares/allowanceRecordValidations.js";
 import { authorizePermission } from "../middlewares/authMiddleware.js";
-import { USER_ROLES } from "../utils/constants.js";
+import { WRITE_ROLES } from "../utils/permissions.js";
 
 const router = Router();
 
 router.route("/")
     .get(getAllAllowanceRecords)
-    .post(authorizePermission(USER_ROLES.HR), validateAllowanceRecordInput, createAllowanceRecord);
+    .post(authorizePermission(...WRITE_ROLES.allowanceRecords), validateAllowanceRecordInput, createAllowanceRecord);
 
 router.route("/:allowanceRecordId")
     .all(validateAllowanceRecordParamId)
     .get(getAllowanceRecord)
-    .patch(authorizePermission(USER_ROLES.HR), validateAllowanceRecordUpdateInput, updateAllowanceRecord)
-    .delete(authorizePermission(USER_ROLES.HR), deleteAllowanceRecord);
+    .patch(authorizePermission(...WRITE_ROLES.allowanceRecords), validateAllowanceRecordUpdateInput, updateAllowanceRecord)
+    .delete(authorizePermission(...WRITE_ROLES.allowanceRecords), deleteAllowanceRecord);
 
 export default router;

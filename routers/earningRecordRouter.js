@@ -7,18 +7,18 @@ import {
     validateEarningRecordInput, validateEarningRecordUpdateInput, validateEarningRecordParamId,
 } from "../middlewares/modelMiddlewares/earningRecordValidations.js";
 import { authorizePermission } from "../middlewares/authMiddleware.js";
-import { USER_ROLES } from "../utils/constants.js";
+import { WRITE_ROLES } from "../utils/permissions.js";
 
 const router = Router();
 
 router.route("/")
     .get(getAllEarningRecords)
-    .post(authorizePermission(USER_ROLES.HR), validateEarningRecordInput, createEarningRecord);
+    .post(authorizePermission(...WRITE_ROLES.earningRecords), validateEarningRecordInput, createEarningRecord);
 
 router.route("/:earningRecordId")
     .all(validateEarningRecordParamId)
     .get(getEarningRecord)
-    .patch(authorizePermission(USER_ROLES.HR), validateEarningRecordUpdateInput, updateEarningRecord)
-    .delete(authorizePermission(USER_ROLES.HR), deleteEarningRecord);
+    .patch(authorizePermission(...WRITE_ROLES.earningRecords), validateEarningRecordUpdateInput, updateEarningRecord)
+    .delete(authorizePermission(...WRITE_ROLES.earningRecords), deleteEarningRecord);
 
 export default router;

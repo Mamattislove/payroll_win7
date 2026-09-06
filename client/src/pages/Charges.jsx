@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { redirect, useLoaderData, useRevalidator, useSearchParams } from "react-router-dom";
+import { redirect, useLoaderData, useRevalidator, useSearchParams, useRouteLoaderData } from "react-router-dom";
 import { toast } from "react-toastify";
 import { FiEdit2, FiPlus, FiTrash2, FiX } from "react-icons/fi";
 import customFetch from "../../utils/customFetch";
 import { useConfirm, Pagination } from "../components";
+import { canWrite } from "../../../utils/permissions";
 
 export const loader = async ({ request }) => {
     try {
@@ -251,6 +252,10 @@ const Charges = () => {
         currentPage,
         chargeTypes,
     } = useLoaderData();
+    const { user } = useRouteLoaderData("dashboard");
+
+    // Same resource the router checks, so the controls and the API agree.
+    const mayEdit = canWrite("chargeRecords", user?.role);
 
     const revalidator = useRevalidator();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -321,13 +326,15 @@ const Charges = () => {
                     <h1 className="text-2xl font-bold text-slate-800">Charges</h1>
                     <p className="text-slate-500 mt-1">Total: {totalChargeRecords}</p>
                 </div>
-                <button
-                    onClick={() => setModal("add")}
-                    className="flex items-center gap-2 py-2.5 px-4 text-sm text-white bg-slate-900 rounded-lg hover:bg-slate-700 transition-colors"
-                >
-                    <FiPlus size={14} />
-                    Add Record
-                </button>
+                {mayEdit && (
+                    <button
+                        onClick={() => setModal("add")}
+                        className="flex items-center gap-2 py-2.5 px-4 text-sm text-white bg-slate-900 rounded-lg hover:bg-slate-700 transition-colors"
+                    >
+                        <FiPlus size={14} />
+                        Add Record
+                    </button>
+                )}
             </div>
 
             {/* Filters */}
@@ -384,10 +391,12 @@ const Charges = () => {
                                         {rec.payroll ? `${fmtDate(rec.payroll.payrollFrom)} – ${fmtDate(rec.payroll.payrollTo)}` : "Standing (unlinked)"}
                                     </p>
                                 </div>
-                                <div className="flex items-center gap-1 shrink-0">
-                                    <button onClick={() => setModal(rec)} className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100" title="Edit"><FiEdit2 size={14} /></button>
-                                    <button onClick={() => handleDelete(rec._id)} disabled={deleting === rec._id} className="p-2 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-40" title="Delete"><FiTrash2 size={14} /></button>
-                                </div>
+                                {mayEdit && (
+                                    <div className="flex items-center gap-1 shrink-0">
+                                        <button onClick={() => setModal(rec)} className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100" title="Edit"><FiEdit2 size={14} /></button>
+                                        <button onClick={() => handleDelete(rec._id)} disabled={deleting === rec._id} className="p-2 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-40" title="Delete"><FiTrash2 size={14} /></button>
+                                    </div>
+                                )}
                             </div>
                             <p className="text-sm font-semibold text-slate-700">{fmt(rec.amount)}</p>
                         </div>
@@ -404,13 +413,15 @@ const Charges = () => {
                             <th className="px-4 py-3 text-left">Name</th>
                             <th className="px-4 py-3 text-left">Pay Period</th>
                             <th className="px-4 py-3 text-right">Amount</th>
-                            <th className="px-4 py-3 text-center">Actions</th>
+                            {mayEdit && (
+                                <th className="px-4 py-3 text-center">Actions</th>
+                            )}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                         {chargeRecords.length === 0 && (
                             <tr>
-                                <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
+                                <td colSpan={mayEdit ? 7 : 6} className="px-4 py-8 text-center text-slate-400">
                                     No charge records found.
                                 </td>
                             </tr>
@@ -441,25 +452,27 @@ const Charges = () => {
                                 <td className="px-4 py-3 text-right font-medium text-slate-700">
                                     {fmt(rec.amount)}
                                 </td>
-                                <td className="px-4 py-3">
-                                    <div className="flex items-center justify-center gap-2">
-                                        <button
-                                            onClick={() => setModal(rec)}
-                                            className="text-slate-400 hover:text-slate-700"
-                                            title="Edit"
-                                        >
-                                            <FiEdit2 size={14} />
-                                        </button>
-                                        <button
-                                            onClick={() => handleDelete(rec._id)}
-                                            disabled={deleting === rec._id}
-                                            className="text-red-400 hover:text-red-600 disabled:opacity-40"
-                                            title="Delete"
-                                        >
-                                            <FiTrash2 size={14} />
-                                        </button>
-                                    </div>
-                                </td>
+                                {mayEdit && (
+                                    <td className="px-4 py-3">
+                                        <div className="flex items-center justify-center gap-2">
+                                            <button
+                                                onClick={() => setModal(rec)}
+                                                className="text-slate-400 hover:text-slate-700"
+                                                title="Edit"
+                                            >
+                                                <FiEdit2 size={14} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(rec._id)}
+                                                disabled={deleting === rec._id}
+                                                className="text-red-400 hover:text-red-600 disabled:opacity-40"
+                                                title="Delete"
+                                            >
+                                                <FiTrash2 size={14} />
+                                            </button>
+                                        </div>
+                                    </td>
+                                )}
                             </tr>
                         ))}
                     </tbody>

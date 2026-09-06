@@ -10,19 +10,19 @@ import {
     validateSavingsRecordParamId,
 } from "../middlewares/modelMiddlewares/savingsRecordValidations.js";
 import { authorizePermission } from "../middlewares/authMiddleware.js";
-import { USER_ROLES } from "../utils/constants.js";
+import { WRITE_ROLES } from "../utils/permissions.js";
 
 const router = Router();
 
 router
     .route("/")
     .get(getAllSavingsRecords)
-    .post(authorizePermission(USER_ROLES.HR), validateSavingsRecordInput, createSavingsRecord);
+    .post(authorizePermission(...WRITE_ROLES.savingsRecords), validateSavingsRecordInput, createSavingsRecord);
 
 router
     .route("/:savingsRecordId")
     .all(validateSavingsRecordParamId)
     .get(getSavingsRecord)
-    .delete(authorizePermission(USER_ROLES.HR), deleteSavingsRecord);
+    .delete(authorizePermission(...WRITE_ROLES.savingsRecords), deleteSavingsRecord);
 
 export default router;

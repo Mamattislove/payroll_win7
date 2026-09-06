@@ -4,10 +4,12 @@ import {
     useLoaderData,
     useSearchParams,
     useRevalidator,
+    useRouteLoaderData,
 } from "react-router-dom";
 import { toast } from "react-toastify";
 import customFetch from "../../utils/customFetch";
 import { HOLIDAY_TYPES } from "../../../utils/constants";
+import { canWrite } from "../../../utils/permissions";
 import {
     FiChevronLeft,
     FiChevronRight,
@@ -90,6 +92,7 @@ function buildHolidayMap(holidays) {
 
 const Holidays = () => {
     const { holidays } = useLoaderData();
+    const { user } = useRouteLoaderData("dashboard");
     const [searchParams, setSearchParams] = useSearchParams();
     const revalidator = useRevalidator();
 
@@ -102,6 +105,10 @@ const Holidays = () => {
     });
     const [saving, setSaving] = useState(false);
     const { confirmModal, askConfirm } = useConfirm();
+
+    // The calendar stays readable for everyone; only the roles the holiday
+    // router accepts get the add form and the delete buttons.
+    const mayEdit = canWrite("holidays", user?.role);
 
     const holidayMap = buildHolidayMap(holidays);
     const cells = buildCalendarCells(year, month);
@@ -327,20 +334,23 @@ const Holidays = () => {
                                                 {h.specialLegal}
                                             </span>
                                         </div>
-                                        <button
-                                            onClick={() =>
-                                                handleDelete(h._id, h.eventName)
-                                            }
-                                            className="text-red-400 hover:text-red-600 shrink-0 transition-colors"
-                                        >
-                                            <FiTrash2 size={14} />
-                                        </button>
+                                        {mayEdit && (
+                                            <button
+                                                onClick={() =>
+                                                    handleDelete(h._id, h.eventName)
+                                                }
+                                                className="text-red-400 hover:text-red-600 shrink-0 transition-colors"
+                                            >
+                                                <FiTrash2 size={14} />
+                                            </button>
+                                        )}
                                     </div>
                                 ))}
                             </div>
                         )}
 
                         {/* Add holiday form */}
+                        {mayEdit && (
                         <form
                             onSubmit={handleAdd}
                             className="flex flex-col gap-3"
@@ -415,6 +425,7 @@ const Holidays = () => {
                                 </button>
                             </div>
                         </form>
+                        )}
                     </div>
                 </div>
             )}

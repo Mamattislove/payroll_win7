@@ -1,9 +1,13 @@
 import { useState, useEffect } from "react";
-import { redirect, useLoaderData, useNavigate } from "react-router-dom";
+import { Link, redirect, useLoaderData, useNavigate, useRouteLoaderData } from "react-router-dom";
 import { toast } from "react-toastify";
 import { FiArrowLeft, FiEdit2, FiPlus, FiTrash2, FiX } from "react-icons/fi";
 import customFetch from "../../utils/customFetch";
 import { InfoField, useConfirm } from "../components";
+import ErrorState, {
+    ACTION_PRIMARY,
+} from "../components/common/ErrorState";
+import { canWrite } from "../../../utils/permissions";
 
 export const loader = async ({ params }) => {
     try {
@@ -101,6 +105,7 @@ const RecordSection = ({
     employeeId,
     payrollId,
     onChanged,
+    editable,
 }) => {
     const [adding, setAdding] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -154,14 +159,16 @@ const RecordSection = ({
                 <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
                     {title} — {fmt(total)}
                 </p>
-                <button
-                    type="button"
-                    onClick={() => setAdding((v) => !v)}
-                    className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
-                >
-                    {adding ? <FiX size={12} /> : <FiPlus size={12} />}
-                    {adding ? "Cancel" : "Add"}
-                </button>
+                {editable && (
+                    <button
+                        type="button"
+                        onClick={() => setAdding((v) => !v)}
+                        className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+                    >
+                        {adding ? <FiX size={12} /> : <FiPlus size={12} />}
+                        {adding ? "Cancel" : "Add"}
+                    </button>
+                )}
             </div>
 
             {records.length === 0 && !adding && (
@@ -179,13 +186,15 @@ const RecordSection = ({
                         </div>
                         <div className="flex items-center gap-2">
                             <span className="text-slate-700">{fmt(r.amount)}</span>
-                            <button
-                                type="button"
-                                onClick={() => handleRemove(r._id)}
-                                className="text-red-400 hover:text-red-600"
-                            >
-                                <FiTrash2 size={13} />
-                            </button>
+                            {editable && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleRemove(r._id)}
+                                    className="text-red-400 hover:text-red-600"
+                                >
+                                    <FiTrash2 size={13} />
+                                </button>
+                            )}
                         </div>
                     </li>
                 ))}
@@ -232,7 +241,7 @@ const RecordSection = ({
 
 // ─── deduction section ────────────────────────────────────────────────────────
 
-const DeductionSection = ({ records, employeeId, payrollId, onChanged }) => {
+const DeductionSection = ({ records, employeeId, payrollId, onChanged, editable }) => {
     const [adding, setAdding] = useState(false);
     const [saving, setSaving] = useState(false);
     const { confirmModal: dedConfirmModal, askConfirm: dedAskConfirm } = useConfirm();
@@ -314,14 +323,16 @@ const DeductionSection = ({ records, employeeId, payrollId, onChanged }) => {
                 <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
                     Deductions — {fmt(total)}
                 </p>
-                <button
-                    type="button"
-                    onClick={adding ? closeAdd : openAdd}
-                    className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
-                >
-                    {adding ? <FiX size={12} /> : <FiPlus size={12} />}
-                    {adding ? "Cancel" : "Add"}
-                </button>
+                {editable && (
+                    <button
+                        type="button"
+                        onClick={adding ? closeAdd : openAdd}
+                        className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+                    >
+                        {adding ? <FiX size={12} /> : <FiPlus size={12} />}
+                        {adding ? "Cancel" : "Add"}
+                    </button>
+                )}
             </div>
 
             {records.length === 0 && !adding && (
@@ -339,13 +350,15 @@ const DeductionSection = ({ records, employeeId, payrollId, onChanged }) => {
                         </div>
                         <div className="flex items-center gap-2">
                             <span className="text-slate-700">{fmt(r.amount)}</span>
-                            <button
-                                type="button"
-                                onClick={() => handleRemove(r._id)}
-                                className="text-red-400 hover:text-red-600"
-                            >
-                                <FiTrash2 size={13} />
-                            </button>
+                            {editable && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleRemove(r._id)}
+                                    className="text-red-400 hover:text-red-600"
+                                >
+                                    <FiTrash2 size={13} />
+                                </button>
+                            )}
                         </div>
                     </li>
                 ))}
@@ -402,7 +415,7 @@ const DeductionSection = ({ records, employeeId, payrollId, onChanged }) => {
 
 // ─── loan section ─────────────────────────────────────────────────────────────
 
-const LoanSection = ({ records, employeeId, payrollId, onChanged }) => {
+const LoanSection = ({ records, employeeId, payrollId, onChanged, editable }) => {
     const [adding, setAdding] = useState(false);
     const [saving, setSaving] = useState(false);
     const { confirmModal, askConfirm } = useConfirm();
@@ -486,14 +499,16 @@ const LoanSection = ({ records, employeeId, payrollId, onChanged }) => {
                 <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
                     Loan Payments — {fmt(total)}
                 </p>
-                <button
-                    type="button"
-                    onClick={adding ? closeAdd : openAdd}
-                    className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
-                >
-                    {adding ? <FiX size={12} /> : <FiPlus size={12} />}
-                    {adding ? "Cancel" : "Add"}
-                </button>
+                {editable && (
+                    <button
+                        type="button"
+                        onClick={adding ? closeAdd : openAdd}
+                        className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+                    >
+                        {adding ? <FiX size={12} /> : <FiPlus size={12} />}
+                        {adding ? "Cancel" : "Add"}
+                    </button>
+                )}
             </div>
 
             {records.length === 0 && !adding && (
@@ -513,13 +528,15 @@ const LoanSection = ({ records, employeeId, payrollId, onChanged }) => {
                         </div>
                         <div className="flex items-center gap-2">
                             <span className="text-slate-700">{fmt(r.amount)}</span>
-                            <button
-                                type="button"
-                                onClick={() => handleRemove(r._id)}
-                                className="text-red-400 hover:text-red-600"
-                            >
-                                <FiTrash2 size={13} />
-                            </button>
+                            {editable && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleRemove(r._id)}
+                                    className="text-red-400 hover:text-red-600"
+                                >
+                                    <FiTrash2 size={13} />
+                                </button>
+                            )}
                         </div>
                     </li>
                 ))}
@@ -575,7 +592,7 @@ const LoanSection = ({ records, employeeId, payrollId, onChanged }) => {
 
 // ─── savings section ──────────────────────────────────────────────────────────
 
-const SavingsSection = ({ records, employeeId, payrollId, onChanged }) => {
+const SavingsSection = ({ records, employeeId, payrollId, onChanged, editable }) => {
     const [adding, setAdding] = useState(false);
     const [saving, setSaving] = useState(false);
     const { confirmModal, askConfirm } = useConfirm();
@@ -657,14 +674,16 @@ const SavingsSection = ({ records, employeeId, payrollId, onChanged }) => {
                 <p className="text-xs font-semibold uppercase tracking-widest text-slate-500">
                     Savings — {fmt(total)}
                 </p>
-                <button
-                    type="button"
-                    onClick={adding ? closeAdd : openAdd}
-                    className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
-                >
-                    {adding ? <FiX size={12} /> : <FiPlus size={12} />}
-                    {adding ? "Cancel" : "Add"}
-                </button>
+                {editable && (
+                    <button
+                        type="button"
+                        onClick={adding ? closeAdd : openAdd}
+                        className="flex items-center gap-1 text-xs px-2 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200"
+                    >
+                        {adding ? <FiX size={12} /> : <FiPlus size={12} />}
+                        {adding ? "Cancel" : "Add"}
+                    </button>
+                )}
             </div>
 
             {records.length === 0 && !adding && (
@@ -684,13 +703,15 @@ const SavingsSection = ({ records, employeeId, payrollId, onChanged }) => {
                         </div>
                         <div className="flex items-center gap-2">
                             <span className="text-slate-700">{fmt(r.amount)}</span>
-                            <button
-                                type="button"
-                                onClick={() => handleRemove(r._id)}
-                                className="text-red-400 hover:text-red-600"
-                            >
-                                <FiTrash2 size={13} />
-                            </button>
+                            {editable && (
+                                <button
+                                    type="button"
+                                    onClick={() => handleRemove(r._id)}
+                                    className="text-red-400 hover:text-red-600"
+                                >
+                                    <FiTrash2 size={13} />
+                                </button>
+                            )}
                         </div>
                     </li>
                 ))}
@@ -1176,7 +1197,21 @@ const EditPayroll = () => {
         attendances,
     } = useLoaderData();
     const navigate = useNavigate();
+    const { user } = useRouteLoaderData("dashboard");
     const [payroll, setPayroll] = useState(initial);
+
+    // This screen exists to change a payroll, so a role that cannot write one
+    // has no business here; the read-only view lives on the payroll list.
+    // The linked-record sections are narrower still -- an encoder may edit the
+    // payroll itself but not the loans, savings or deductions hanging off it --
+    // so each gets the flag for its own resource rather than this one.
+    const mayEditPayroll = canWrite("payrolls", user?.role);
+    const canEarnings = canWrite("earningRecords", user?.role);
+    const canAllowances = canWrite("allowanceRecords", user?.role);
+    const canCharges = canWrite("chargeRecords", user?.role);
+    const canDeductions = canWrite("deductionPayments", user?.role);
+    const canLoans = canWrite("loanPayments", user?.role);
+    const canSavings = canWrite("savingsRecords", user?.role);
 
     const refresh = async () => {
         const { data } = await customFetch.get(`/payrolls/${payroll._id}`);
@@ -1199,6 +1234,20 @@ const EditPayroll = () => {
         { label: "Late", value: fmt(payroll.late) },
         { label: "Undertime", value: fmt(payroll.undertime) },
     ];
+
+    if (!mayEditPayroll)
+        return (
+            <ErrorState
+                inline
+                code="403"
+                title="You cannot edit payroll"
+                message="Your account can view payroll records but not change them. Ask an administrator if you need edit access."
+            >
+                <Link to="/dashboard/payroll" className={ACTION_PRIMARY}>
+                    Back to payroll
+                </Link>
+            </ErrorState>
+        );
 
     const totalFields = [
         { label: "Gross Pay", value: fmt(payroll.grossPay) },
@@ -1270,35 +1319,7 @@ const EditPayroll = () => {
                                 employeeId={employeeId}
                                 payrollId={payroll._id}
                                 onChanged={refresh}
-                            />
-                            <RecordSection
-                                title="Allowances"
-                                records={payroll.allowances || []}
-                                types={allowanceTypes}
-                                typeKey="allowanceType"
-                                typeLabelKey="allowanceName"
-                                endpoint="/allowance-records"
-                                employeeId={employeeId}
-                                payrollId={payroll._id}
-                                onChanged={refresh}
-                            />
-                            <DeductionSection
-                                records={payroll.deductions || []}
-                                employeeId={employeeId}
-                                payrollId={payroll._id}
-                                onChanged={refresh}
-                            />
-                            <LoanSection
-                                records={payroll.loans || []}
-                                employeeId={employeeId}
-                                payrollId={payroll._id}
-                                onChanged={refresh}
-                            />
-                            <SavingsSection
-                                records={payroll.savings || []}
-                                employeeId={employeeId}
-                                payrollId={payroll._id}
-                                onChanged={refresh}
+                                editable={canEarnings}
                             />
                             <RecordSection
                                 title="Charges"
@@ -1310,6 +1331,40 @@ const EditPayroll = () => {
                                 employeeId={employeeId}
                                 payrollId={payroll._id}
                                 onChanged={refresh}
+                                editable={canCharges}
+                            />
+                            <RecordSection
+                                title="Allowances"
+                                records={payroll.allowances || []}
+                                types={allowanceTypes}
+                                typeKey="allowanceType"
+                                typeLabelKey="allowanceName"
+                                endpoint="/allowance-records"
+                                employeeId={employeeId}
+                                payrollId={payroll._id}
+                                onChanged={refresh}
+                                editable={canAllowances}
+                            />
+                            <DeductionSection
+                                records={payroll.deductions || []}
+                                employeeId={employeeId}
+                                payrollId={payroll._id}
+                                onChanged={refresh}
+                                editable={canDeductions}
+                            />
+                            <LoanSection
+                                records={payroll.loans || []}
+                                employeeId={employeeId}
+                                payrollId={payroll._id}
+                                onChanged={refresh}
+                                editable={canLoans}
+                            />
+                            <SavingsSection
+                                records={payroll.savings || []}
+                                employeeId={employeeId}
+                                payrollId={payroll._id}
+                                onChanged={refresh}
+                                editable={canSavings}
                             />
                         </div>
                     </div>

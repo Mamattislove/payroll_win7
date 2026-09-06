@@ -12,7 +12,7 @@ import {
     validateDeductionPaymentParamId,
 } from "../middlewares/modelMiddlewares/deductionPaymentValidations.js";
 import { authorizePermission } from "../middlewares/authMiddleware.js";
-import { USER_ROLES } from "../utils/constants.js";
+import { WRITE_ROLES } from "../utils/permissions.js";
 
 const router = Router();
 
@@ -20,7 +20,7 @@ router
     .route("/")
     .get(getAllDeductionPayments)
     .post(
-        authorizePermission(USER_ROLES.ADMIN, USER_ROLES.HR),
+        authorizePermission(...WRITE_ROLES.deductionPayments),
         validateDeductionPaymentInput,
         createDeductionPayment,
     );
@@ -30,10 +30,10 @@ router
     .all(validateDeductionPaymentParamId)
     .get(getDeductionPayment)
     .patch(
-        authorizePermission(USER_ROLES.ADMIN, USER_ROLES.HR),
+        authorizePermission(...WRITE_ROLES.deductionPayments),
         validateDeductionPaymentUpdateInput,
         updateDeductionPayment,
     )
-    .delete(authorizePermission(USER_ROLES.ADMIN, USER_ROLES.HR), deleteDeductionPayment);
+    .delete(authorizePermission(...WRITE_ROLES.deductionPayments), deleteDeductionPayment);
 
 export default router;

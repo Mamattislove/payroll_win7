@@ -10,14 +10,14 @@ import {
     validateLoanPaymentParamId,
 } from "../middlewares/modelMiddlewares/loanPaymentValidations.js";
 import { authorizePermission } from "../middlewares/authMiddleware.js";
-import { USER_ROLES } from "../utils/constants.js";
+import { WRITE_ROLES } from "../utils/permissions.js";
 
 const router = Router();
 router
     .route("/")
     .get(getAllLoanPayments)
     .post(
-        authorizePermission(USER_ROLES.HR),
+        authorizePermission(...WRITE_ROLES.loanPayments),
         validateLoanPaymentInput,
         createLoanPayment,
     );
@@ -25,5 +25,5 @@ router
     .route("/:loanPaymentId")
     .all(validateLoanPaymentParamId)
     .get(getLoanPayment)
-    .delete(authorizePermission(USER_ROLES.HR), deleteLoanPayment);
+    .delete(authorizePermission(...WRITE_ROLES.loanPayments), deleteLoanPayment);
 export default router;

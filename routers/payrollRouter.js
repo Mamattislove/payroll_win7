@@ -14,7 +14,7 @@ import {
     validatePayrollParamId,
 } from "../middlewares/modelMiddlewares/payrollValidations.js";
 import { authorizePermission } from "../middlewares/authMiddleware.js";
-import { USER_ROLES } from "../utils/constants.js";
+import { WRITE_ROLES } from "../utils/permissions.js";
 
 const router = Router();
 
@@ -25,13 +25,24 @@ router.get("/dashboard-summary", getDashboardSummary);
 router
     .route("/")
     .get(getAllPayrolls)
-    .post(authorizePermission(USER_ROLES.HR), validatePayrollInput, createPayroll);
+    .post(
+        authorizePermission(...WRITE_ROLES.payrolls),
+        validatePayrollInput,
+        createPayroll,
+    );
 
 router
     .route("/:payrollId")
     .all(validatePayrollParamId)
     .get(getPayroll)
-    .patch(authorizePermission(USER_ROLES.HR), validatePayrollUpdateInput, updatePayroll)
-    .delete(authorizePermission(USER_ROLES.HR), deletePayroll);
+    .patch(
+        authorizePermission(...WRITE_ROLES.payrolls),
+        validatePayrollUpdateInput,
+        updatePayroll,
+    )
+    .delete(
+        authorizePermission(...WRITE_ROLES.payrolls),
+        deletePayroll,
+    );
 
 export default router;

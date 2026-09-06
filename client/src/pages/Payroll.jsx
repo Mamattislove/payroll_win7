@@ -1,10 +1,24 @@
 import { useState, useEffect, useRef } from "react";
-import { redirect, useLoaderData, useNavigate, useSearchParams, useRevalidator } from "react-router-dom";
+import {
+    redirect,
+    useLoaderData,
+    useNavigate,
+    useSearchParams,
+    useRevalidator,
+    useRouteLoaderData,
+} from "react-router-dom";
 import { toast } from "react-toastify";
 import { FiEdit2, FiEye, FiPlus, FiTrash2, FiX } from "react-icons/fi";
 import customFetch from "../../utils/customFetch";
-import { Overlay, InfoField, useConfirm, Pagination, ClientCombobox } from "../components";
+import {
+    Overlay,
+    InfoField,
+    useConfirm,
+    Pagination,
+    ClientCombobox,
+} from "../components";
 import { COMPENSATION_STATUS, DAY_TYPES } from "../../../utils/constants";
+import { canWrite } from "../../../utils/permissions";
 import { computePayroll } from "@shared/computePayroll";
 
 export const loader = async ({ request }) => {
@@ -70,8 +84,12 @@ const cutoffDateTo = (fromVal) => {
     const day = d.getUTCDate();
     const year = d.getUTCFullYear();
     const month = d.getUTCMonth();
-    if (day === 1) return new Date(Date.UTC(year, month, 15)).toISOString().slice(0, 10);
-    if (day === 16) return new Date(Date.UTC(year, month + 1, 0)).toISOString().slice(0, 10);
+    if (day === 1)
+        return new Date(Date.UTC(year, month, 15)).toISOString().slice(0, 10);
+    if (day === 16)
+        return new Date(Date.UTC(year, month + 1, 0))
+            .toISOString()
+            .slice(0, 10);
     return null;
 };
 
@@ -135,15 +153,30 @@ const EmployeeCombobox = ({ value, onChange, initialSelected, client }) => {
                 if (!cancelled) setLoading(false);
             }
         }, 300);
-        return () => { cancelled = true; clearTimeout(timer); };
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
     }, [query, open, client]);
 
-    const handleSelect = (comp) => { setSelected(comp); onChange(comp); setQuery(""); setOpen(false); };
-    const handleClear = () => { setSelected(null); onChange(null); setQuery(""); };
+    const handleSelect = (comp) => {
+        setSelected(comp);
+        onChange(comp);
+        setQuery("");
+        setOpen(false);
+    };
+    const handleClear = () => {
+        setSelected(null);
+        onChange(null);
+        setQuery("");
+    };
 
     useEffect(() => {
         const handler = (e) => {
-            if (containerRef.current && !containerRef.current.contains(e.target)) {
+            if (
+                containerRef.current &&
+                !containerRef.current.contains(e.target)
+            ) {
                 setOpen(false);
                 setQuery("");
             }
@@ -152,7 +185,7 @@ const EmployeeCombobox = ({ value, onChange, initialSelected, client }) => {
         return () => document.removeEventListener("mousedown", handler);
     }, []);
 
-    const displayValue = open ? query : (selected ? employeeName(selected) : "");
+    const displayValue = open ? query : selected ? employeeName(selected) : "";
 
     return (
         <div ref={containerRef} className="relative w-full">
@@ -160,16 +193,22 @@ const EmployeeCombobox = ({ value, onChange, initialSelected, client }) => {
                 <input
                     type="text"
                     value={displayValue}
-                    onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+                    onChange={(e) => {
+                        setQuery(e.target.value);
+                        setOpen(true);
+                    }}
                     onFocus={() => setOpen(true)}
                     placeholder="Search employee…"
                     className={`${inputCls} pr-8`}
                     autoComplete="off"
                 />
                 {selected && !open && (
-                    <button type="button" onClick={handleClear}
+                    <button
+                        type="button"
+                        onClick={handleClear}
                         className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                        title="Clear">
+                        title="Clear"
+                    >
                         <FiX size={14} />
                     </button>
                 )}
@@ -177,31 +216,51 @@ const EmployeeCombobox = ({ value, onChange, initialSelected, client }) => {
             {open && (
                 <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                     {loading ? (
-                        <p className="px-3 py-2.5 text-sm text-slate-400">Searching…</p>
+                        <p className="px-3 py-2.5 text-sm text-slate-400">
+                            Searching…
+                        </p>
                     ) : results.length === 0 ? (
-                        <p className="px-3 py-2.5 text-sm text-slate-400">No employees found.</p>
+                        <p className="px-3 py-2.5 text-sm text-slate-400">
+                            No employees found.
+                        </p>
                     ) : (
                         results.map((c) => {
-                            const code = c.employeeDesignation?.employee?.employeeCode;
-                            const client = c.employeeDesignation?.client?.clientName;
-                            const inactive = c.activeStatus !== COMPENSATION_STATUS.ACTIVE;
+                            const code =
+                                c.employeeDesignation?.employee?.employeeCode;
+                            const client =
+                                c.employeeDesignation?.client?.clientName;
+                            const inactive =
+                                c.activeStatus !== COMPENSATION_STATUS.ACTIVE;
                             return (
-                                <button key={c._id} type="button"
+                                <button
+                                    key={c._id}
+                                    type="button"
                                     onMouseDown={(e) => e.preventDefault()}
                                     onClick={() => handleSelect(c)}
-                                    className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between gap-2 hover:bg-slate-50 ${value === c._id ? "bg-slate-50 font-semibold" : ""}`}>
+                                    className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between gap-2 hover:bg-slate-50 ${value === c._id ? "bg-slate-50 font-semibold" : ""}`}
+                                >
                                     <span className="min-w-0">
                                         <span className="flex items-center gap-1.5">
-                                            <span className="text-slate-800 truncate">{employeeName(c)}</span>
+                                            <span className="text-slate-800 truncate">
+                                                {employeeName(c)}
+                                            </span>
                                             {inactive && (
                                                 <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-slate-100 text-slate-500 shrink-0">
                                                     Inactive
                                                 </span>
                                             )}
                                         </span>
-                                        {client && <span className="block text-xs text-slate-400 truncate">{client}</span>}
+                                        {client && (
+                                            <span className="block text-xs text-slate-400 truncate">
+                                                {client}
+                                            </span>
+                                        )}
                                     </span>
-                                    {code && <span className="text-slate-400 text-xs shrink-0">{code}</span>}
+                                    {code && (
+                                        <span className="text-slate-400 text-xs shrink-0">
+                                            {code}
+                                        </span>
+                                    )}
                                 </button>
                             );
                         })
@@ -214,7 +273,18 @@ const EmployeeCombobox = ({ value, onChange, initialSelected, client }) => {
 
 // ─── record section (earnings / allowances / charges) ──────────────────────────
 
-const RecordSection = ({ title, records, types, typeKey, typeLabelKey, endpoint, employeeId, payrollId, onChanged, editable }) => {
+const RecordSection = ({
+    title,
+    records,
+    types,
+    typeKey,
+    typeLabelKey,
+    endpoint,
+    employeeId,
+    payrollId,
+    onChanged,
+    editable,
+}) => {
     const [adding, setAdding] = useState(false);
     const [saving, setSaving] = useState(false);
     const { confirmModal, askConfirm } = useConfirm();
@@ -238,7 +308,9 @@ const RecordSection = ({ title, records, types, typeKey, typeLabelKey, endpoint,
             onChanged();
         } catch (error) {
             toast.error(
-                error?.response?.data?.msg || error?.response?.data?.message || error.message,
+                error?.response?.data?.msg ||
+                    error?.response?.data?.message ||
+                    error.message,
             );
         } finally {
             setSaving(false);
@@ -246,19 +318,30 @@ const RecordSection = ({ title, records, types, typeKey, typeLabelKey, endpoint,
     };
 
     const handleRemove = (recordId) => {
-        askConfirm(`Remove this ${title.toLowerCase()} from the payroll?`, async () => {
-            try {
-                const remainingIds = records.filter((r) => r._id !== recordId).map((r) => r._id);
-                const key = endpoint.replace("/", "").replace("-records", "s");
-                await customFetch.patch(`/payrolls/${payrollId}`, { [key]: remainingIds });
-                toast.success(`${title} removed`);
-                onChanged();
-            } catch (error) {
-                toast.error(
-                    error?.response?.data?.msg || error?.response?.data?.message || error.message,
-                );
-            }
-        });
+        askConfirm(
+            `Remove this ${title.toLowerCase()} from the payroll?`,
+            async () => {
+                try {
+                    const remainingIds = records
+                        .filter((r) => r._id !== recordId)
+                        .map((r) => r._id);
+                    const key = endpoint
+                        .replace("/", "")
+                        .replace("-records", "s");
+                    await customFetch.patch(`/payrolls/${payrollId}`, {
+                        [key]: remainingIds,
+                    });
+                    toast.success(`${title} removed`);
+                    onChanged();
+                } catch (error) {
+                    toast.error(
+                        error?.response?.data?.msg ||
+                            error?.response?.data?.message ||
+                            error.message,
+                    );
+                }
+            },
+        );
     };
 
     return (
@@ -280,12 +363,17 @@ const RecordSection = ({ title, records, types, typeKey, typeLabelKey, endpoint,
             </div>
 
             {records.length === 0 && !adding && (
-                <p className="text-xs text-slate-400 py-2">No {title.toLowerCase()} linked.</p>
+                <p className="text-xs text-slate-400 py-2">
+                    No {title.toLowerCase()} linked.
+                </p>
             )}
 
             <ul className="divide-y divide-slate-100">
                 {records.map((r) => (
-                    <li key={r._id} className="flex items-center justify-between py-1.5 text-sm">
+                    <li
+                        key={r._id}
+                        className="flex items-center justify-between py-1.5 text-sm"
+                    >
                         <div>
                             <span className="text-slate-800">{r.name}</span>
                             <span className="text-slate-400 ml-2 text-xs">
@@ -293,7 +381,9 @@ const RecordSection = ({ title, records, types, typeKey, typeLabelKey, endpoint,
                             </span>
                         </div>
                         <div className="flex items-center gap-2">
-                            <span className="text-slate-700">{fmt(r.amount)}</span>
+                            <span className="text-slate-700">
+                                {fmt(r.amount)}
+                            </span>
                             {editable && (
                                 <button
                                     type="button"
@@ -310,7 +400,10 @@ const RecordSection = ({ title, records, types, typeKey, typeLabelKey, endpoint,
             </ul>
 
             {adding && (
-                <form onSubmit={handleAdd} className="mt-3 pt-3 border-t border-slate-100 flex flex-col gap-2">
+                <form
+                    onSubmit={handleAdd}
+                    className="mt-3 pt-3 border-t border-slate-100 flex flex-col gap-2"
+                >
                     <select name={typeKey} required className={inputCls}>
                         <option value="">— Type —</option>
                         {types.map((t) => (
@@ -320,7 +413,12 @@ const RecordSection = ({ title, records, types, typeKey, typeLabelKey, endpoint,
                         ))}
                     </select>
                     <div className="grid grid-cols-2 gap-2">
-                        <input name="name" placeholder="Name" required className={inputCls} />
+                        <input
+                            name="name"
+                            placeholder="Name"
+                            required
+                            className={inputCls}
+                        />
                         <input
                             name="amount"
                             type="number"
@@ -347,10 +445,17 @@ const RecordSection = ({ title, records, types, typeKey, typeLabelKey, endpoint,
 
 // ─── deduction section ────────────────────────────────────────────────────────
 
-const DeductionSection = ({ records, employeeId, payrollId, onChanged, editable }) => {
+const DeductionSection = ({
+    records,
+    employeeId,
+    payrollId,
+    onChanged,
+    editable,
+}) => {
     const [adding, setAdding] = useState(false);
     const [saving, setSaving] = useState(false);
-    const { confirmModal: dedConfirmModal, askConfirm: dedAskConfirm } = useConfirm();
+    const { confirmModal: dedConfirmModal, askConfirm: dedAskConfirm } =
+        useConfirm();
     const [existingRecords, setExistingRecords] = useState([]);
     const [loadingRecords, setLoadingRecords] = useState(false);
     const [selectedRecord, setSelectedRecord] = useState(null);
@@ -382,9 +487,16 @@ const DeductionSection = ({ records, employeeId, payrollId, onChanged, editable 
     };
 
     const handleRecordSelect = (e) => {
-        const rec = existingRecords.find((r) => r._id === e.target.value) || null;
+        const rec =
+            existingRecords.find((r) => r._id === e.target.value) || null;
         setSelectedRecord(rec);
-        setAmount(rec?.monthlyDeduction ? String(rec.monthlyDeduction) : rec?.currentAmount != null ? String(rec.currentAmount) : "");
+        setAmount(
+            rec?.monthlyDeduction
+                ? String(rec.monthlyDeduction)
+                : rec?.currentAmount != null
+                  ? String(rec.currentAmount)
+                  : "",
+        );
     };
 
     const handleAddExisting = async (e) => {
@@ -402,7 +514,9 @@ const DeductionSection = ({ records, employeeId, payrollId, onChanged, editable 
             onChanged();
         } catch (error) {
             toast.error(
-                error?.response?.data?.msg || error?.response?.data?.message || error.message,
+                error?.response?.data?.msg ||
+                    error?.response?.data?.message ||
+                    error.message,
             );
         } finally {
             setSaving(false);
@@ -410,17 +524,24 @@ const DeductionSection = ({ records, employeeId, payrollId, onChanged, editable 
     };
 
     const handleRemove = (paymentId) => {
-        dedAskConfirm("Remove this deduction payment from the payroll?", async () => {
-            try {
-                await customFetch.delete(`/deduction-payments/${paymentId}`);
-                toast.success("Deduction removed");
-                onChanged();
-            } catch (error) {
-                toast.error(
-                    error?.response?.data?.msg || error?.response?.data?.message || error.message,
-                );
-            }
-        });
+        dedAskConfirm(
+            "Remove this deduction payment from the payroll?",
+            async () => {
+                try {
+                    await customFetch.delete(
+                        `/deduction-payments/${paymentId}`,
+                    );
+                    toast.success("Deduction removed");
+                    onChanged();
+                } catch (error) {
+                    toast.error(
+                        error?.response?.data?.msg ||
+                            error?.response?.data?.message ||
+                            error.message,
+                    );
+                }
+            },
+        );
     };
 
     return (
@@ -442,20 +563,30 @@ const DeductionSection = ({ records, employeeId, payrollId, onChanged, editable 
             </div>
 
             {records.length === 0 && !adding && (
-                <p className="text-xs text-slate-400 py-2">No deductions linked.</p>
+                <p className="text-xs text-slate-400 py-2">
+                    No deductions linked.
+                </p>
             )}
 
             <ul className="divide-y divide-slate-100">
                 {records.map((r) => (
-                    <li key={r._id} className="flex items-center justify-between py-1.5 text-sm">
+                    <li
+                        key={r._id}
+                        className="flex items-center justify-between py-1.5 text-sm"
+                    >
                         <div>
-                            <span className="text-slate-800">{r.deductionRecord?.name}</span>
+                            <span className="text-slate-800">
+                                {r.deductionRecord?.name}
+                            </span>
                             <span className="text-slate-400 ml-2 text-xs">
-                                {r.deductionRecord?.deductionType?.deductionName ?? ""}
+                                {r.deductionRecord?.deductionType
+                                    ?.deductionName ?? ""}
                             </span>
                         </div>
                         <div className="flex items-center gap-2">
-                            <span className="text-slate-700">{fmt(r.amount)}</span>
+                            <span className="text-slate-700">
+                                {fmt(r.amount)}
+                            </span>
                             {editable && (
                                 <button
                                     type="button"
@@ -472,9 +603,14 @@ const DeductionSection = ({ records, employeeId, payrollId, onChanged, editable 
             </ul>
 
             {adding && (
-                <form onSubmit={handleAddExisting} className="mt-3 pt-3 border-t border-slate-100 flex flex-col gap-2">
+                <form
+                    onSubmit={handleAddExisting}
+                    className="mt-3 pt-3 border-t border-slate-100 flex flex-col gap-2"
+                >
                     {loadingRecords ? (
-                        <p className="text-xs text-slate-400 py-1">Loading records…</p>
+                        <p className="text-xs text-slate-400 py-1">
+                            Loading records…
+                        </p>
                     ) : (
                         <select
                             required
@@ -482,7 +618,9 @@ const DeductionSection = ({ records, employeeId, payrollId, onChanged, editable 
                             onChange={handleRecordSelect}
                             className={inputCls}
                         >
-                            <option value="">— Select deduction record —</option>
+                            <option value="">
+                                — Select deduction record —
+                            </option>
                             {existingRecords.map((rec) => (
                                 <option key={rec._id} value={rec._id}>
                                     {rec.name}
@@ -522,7 +660,13 @@ const DeductionSection = ({ records, employeeId, payrollId, onChanged, editable 
 
 // ─── loan section ─────────────────────────────────────────────────────────────
 
-const LoanSection = ({ records, employeeId, payrollId, onChanged, editable }) => {
+const LoanSection = ({
+    records,
+    employeeId,
+    payrollId,
+    onChanged,
+    editable,
+}) => {
     const [adding, setAdding] = useState(false);
     const [saving, setSaving] = useState(false);
     const { confirmModal, askConfirm } = useConfirm();
@@ -561,7 +705,9 @@ const LoanSection = ({ records, employeeId, payrollId, onChanged, editable }) =>
         setSelectedLoan(l);
         setAmount(
             l
-                ? String(Math.min(l.monthlyAmortization || 0, l.loanPayable || 0))
+                ? String(
+                      Math.min(l.monthlyAmortization || 0, l.loanPayable || 0),
+                  )
                 : "",
         );
     };
@@ -581,7 +727,9 @@ const LoanSection = ({ records, employeeId, payrollId, onChanged, editable }) =>
             onChanged();
         } catch (error) {
             toast.error(
-                error?.response?.data?.msg || error?.response?.data?.message || error.message,
+                error?.response?.data?.msg ||
+                    error?.response?.data?.message ||
+                    error.message,
             );
         } finally {
             setSaving(false);
@@ -589,17 +737,22 @@ const LoanSection = ({ records, employeeId, payrollId, onChanged, editable }) =>
     };
 
     const handleRemove = (paymentId) => {
-        askConfirm("Remove this loan payment from the payroll? The balance will be restored.", async () => {
-            try {
-                await customFetch.delete(`/loan-payments/${paymentId}`);
-                toast.success("Loan payment removed");
-                onChanged();
-            } catch (error) {
-                toast.error(
-                    error?.response?.data?.msg || error?.response?.data?.message || error.message,
-                );
-            }
-        });
+        askConfirm(
+            "Remove this loan payment from the payroll? The balance will be restored.",
+            async () => {
+                try {
+                    await customFetch.delete(`/loan-payments/${paymentId}`);
+                    toast.success("Loan payment removed");
+                    onChanged();
+                } catch (error) {
+                    toast.error(
+                        error?.response?.data?.msg ||
+                            error?.response?.data?.message ||
+                            error.message,
+                    );
+                }
+            },
+        );
     };
 
     return (
@@ -621,14 +774,21 @@ const LoanSection = ({ records, employeeId, payrollId, onChanged, editable }) =>
             </div>
 
             {records.length === 0 && !adding && (
-                <p className="text-xs text-slate-400 py-2">No loan payments linked.</p>
+                <p className="text-xs text-slate-400 py-2">
+                    No loan payments linked.
+                </p>
             )}
 
             <ul className="divide-y divide-slate-100">
                 {records.map((r) => (
-                    <li key={r._id} className="flex items-center justify-between py-1.5 text-sm">
+                    <li
+                        key={r._id}
+                        className="flex items-center justify-between py-1.5 text-sm"
+                    >
                         <div>
-                            <span className="text-slate-800">{r.loan?.loanName || "Loan"}</span>
+                            <span className="text-slate-800">
+                                {r.loan?.loanName || "Loan"}
+                            </span>
                             {r.loan?.loanType?.loanTypeName && (
                                 <span className="text-slate-400 ml-2 text-xs">
                                     {r.loan.loanType.loanTypeName}
@@ -636,7 +796,9 @@ const LoanSection = ({ records, employeeId, payrollId, onChanged, editable }) =>
                             )}
                         </div>
                         <div className="flex items-center gap-2">
-                            <span className="text-slate-700">{fmt(r.amount)}</span>
+                            <span className="text-slate-700">
+                                {fmt(r.amount)}
+                            </span>
                             {editable && (
                                 <button
                                     type="button"
@@ -658,7 +820,9 @@ const LoanSection = ({ records, employeeId, payrollId, onChanged, editable }) =>
                     className="mt-3 pt-3 border-t border-slate-100 flex flex-col gap-2"
                 >
                     {loadingList ? (
-                        <p className="text-xs text-slate-400 py-1">Loading loans…</p>
+                        <p className="text-xs text-slate-400 py-1">
+                            Loading loans…
+                        </p>
                     ) : (
                         <select
                             required
@@ -670,7 +834,9 @@ const LoanSection = ({ records, employeeId, payrollId, onChanged, editable }) =>
                             {loanList.map((l) => (
                                 <option key={l._id} value={l._id}>
                                     {l.loanName}
-                                    {l.loanType?.loanTypeName ? ` (${l.loanType.loanTypeName})` : ""}
+                                    {l.loanType?.loanTypeName
+                                        ? ` (${l.loanType.loanTypeName})`
+                                        : ""}
                                     {` — Bal: ₱${Number(l.loanPayable).toLocaleString("en-PH", { minimumFractionDigits: 2 })}`}
                                 </option>
                             ))}
@@ -702,7 +868,13 @@ const LoanSection = ({ records, employeeId, payrollId, onChanged, editable }) =>
 
 // ─── savings section ──────────────────────────────────────────────────────────
 
-const SavingsSection = ({ records, employeeId, payrollId, onChanged, editable }) => {
+const SavingsSection = ({
+    records,
+    employeeId,
+    payrollId,
+    onChanged,
+    editable,
+}) => {
     const [adding, setAdding] = useState(false);
     const [saving, setSaving] = useState(false);
     const { confirmModal, askConfirm } = useConfirm();
@@ -739,7 +911,11 @@ const SavingsSection = ({ records, employeeId, payrollId, onChanged, editable })
     const handleSelect = (e) => {
         const s = savingsList.find((r) => r._id === e.target.value) || null;
         setSelectedSavings(s);
-        setAmount(s?.cutoffDeductionAmount != null ? String(s.cutoffDeductionAmount) : "");
+        setAmount(
+            s?.cutoffDeductionAmount != null
+                ? String(s.cutoffDeductionAmount)
+                : "",
+        );
     };
 
     const handleAdd = async (e) => {
@@ -757,7 +933,9 @@ const SavingsSection = ({ records, employeeId, payrollId, onChanged, editable })
             onChanged();
         } catch (error) {
             toast.error(
-                error?.response?.data?.msg || error?.response?.data?.message || error.message,
+                error?.response?.data?.msg ||
+                    error?.response?.data?.message ||
+                    error.message,
             );
         } finally {
             setSaving(false);
@@ -765,17 +943,22 @@ const SavingsSection = ({ records, employeeId, payrollId, onChanged, editable })
     };
 
     const handleRemove = (paymentId) => {
-        askConfirm("Remove this savings deduction from the payroll?", async () => {
-            try {
-                await customFetch.delete(`/savings-records/${paymentId}`);
-                toast.success("Savings deduction removed");
-                onChanged();
-            } catch (error) {
-                toast.error(
-                    error?.response?.data?.msg || error?.response?.data?.message || error.message,
-                );
-            }
-        });
+        askConfirm(
+            "Remove this savings deduction from the payroll?",
+            async () => {
+                try {
+                    await customFetch.delete(`/savings-records/${paymentId}`);
+                    toast.success("Savings deduction removed");
+                    onChanged();
+                } catch (error) {
+                    toast.error(
+                        error?.response?.data?.msg ||
+                            error?.response?.data?.message ||
+                            error.message,
+                    );
+                }
+            },
+        );
     };
 
     return (
@@ -797,12 +980,17 @@ const SavingsSection = ({ records, employeeId, payrollId, onChanged, editable })
             </div>
 
             {records.length === 0 && !adding && (
-                <p className="text-xs text-slate-400 py-2">No savings linked.</p>
+                <p className="text-xs text-slate-400 py-2">
+                    No savings linked.
+                </p>
             )}
 
             <ul className="divide-y divide-slate-100">
                 {records.map((r) => (
-                    <li key={r._id} className="flex items-center justify-between py-1.5 text-sm">
+                    <li
+                        key={r._id}
+                        className="flex items-center justify-between py-1.5 text-sm"
+                    >
                         <div>
                             <span className="text-slate-800">Savings</span>
                             {r.savings?.savingsTarget != null && (
@@ -812,7 +1000,9 @@ const SavingsSection = ({ records, employeeId, payrollId, onChanged, editable })
                             )}
                         </div>
                         <div className="flex items-center gap-2">
-                            <span className="text-slate-700">{fmt(r.amount)}</span>
+                            <span className="text-slate-700">
+                                {fmt(r.amount)}
+                            </span>
                             {editable && (
                                 <button
                                     type="button"
@@ -834,7 +1024,9 @@ const SavingsSection = ({ records, employeeId, payrollId, onChanged, editable })
                     className="mt-3 pt-3 border-t border-slate-100 flex flex-col gap-2"
                 >
                     {loadingList ? (
-                        <p className="text-xs text-slate-400 py-1">Loading savings plans…</p>
+                        <p className="text-xs text-slate-400 py-1">
+                            Loading savings plans…
+                        </p>
                     ) : (
                         <select
                             required
@@ -881,7 +1073,9 @@ const StatTile = ({ label, value }) => (
         <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1">
             {label}
         </p>
-        <p className="text-lg font-semibold text-slate-800 tabular-nums">{value}</p>
+        <p className="text-lg font-semibold text-slate-800 tabular-nums">
+            {value}
+        </p>
     </div>
 );
 
@@ -933,14 +1127,15 @@ const AttendanceBreakdown = ({ item }) => {
     if (rows.length === 0) {
         return (
             <p className="text-sm text-slate-400">
-                No attendance records exist for this period, so the pay cannot be
-                traced back to individual days. Payrolls up to May 2026 were
+                No attendance records exist for this period, so the pay cannot
+                be traced back to individual days. Payrolls up to May 2026 were
                 imported from the previous system without their timekeeping.
             </p>
         );
     }
 
-    const sum = (field) => rows.reduce((s, r) => s + (Number(r[field]) || 0), 0);
+    const sum = (field) =>
+        rows.reduce((s, r) => s + (Number(r[field]) || 0), 0);
     const totals = {
         regularHours: sum("regularHours"),
         overtimeHours: sum("overtimeHours"),
@@ -968,7 +1163,10 @@ const AttendanceBreakdown = ({ item }) => {
                 <StatTile label="Days" value={daysWorked} />
                 <StatTile label="Reg Hrs" value={h2(totals.regularHours)} />
                 <StatTile label="OT Hrs" value={h2(totals.overtimeHours)} />
-                <StatTile label="Night Prem" value={h2(totals.nightPremiumHours)} />
+                <StatTile
+                    label="Night Prem"
+                    value={h2(totals.nightPremiumHours)}
+                />
                 <StatTile label="Late" value={h2(totals.lateHr)} />
                 <StatTile label="Undertime" value={h2(totals.undertimeHr)} />
             </div>
@@ -979,14 +1177,18 @@ const AttendanceBreakdown = ({ item }) => {
                         <thead>
                             <tr className="bg-slate-900 text-white uppercase tracking-wider sticky top-0">
                                 <th className="px-3 py-2 text-left">Date</th>
-                                <th className="px-3 py-2 text-left">Day Type</th>
+                                <th className="px-3 py-2 text-left">
+                                    Day Type
+                                </th>
                                 <th className="px-3 py-2 text-right">Reg</th>
                                 <th className="px-3 py-2 text-right">OT</th>
                                 <th className="px-3 py-2 text-right">ND</th>
                                 <th className="px-3 py-2 text-right">OT-ND</th>
                                 <th className="px-3 py-2 text-right">Late</th>
                                 <th className="px-3 py-2 text-right">UT</th>
-                                <th className="px-3 py-2 text-right">Regular Pay</th>
+                                <th className="px-3 py-2 text-right">
+                                    Regular Pay
+                                </th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -1001,12 +1203,24 @@ const AttendanceBreakdown = ({ item }) => {
                                     <td className="px-3 py-1.5 text-slate-600 whitespace-nowrap">
                                         {row.dayType || "—"}
                                     </td>
-                                    <td className="px-3 py-1.5 text-right text-slate-600 tabular-nums">{h2(row.regularHours)}</td>
-                                    <td className="px-3 py-1.5 text-right text-slate-600 tabular-nums">{h2(row.overtimeHours)}</td>
-                                    <td className="px-3 py-1.5 text-right text-slate-600 tabular-nums">{h2(row.nightPremiumHours)}</td>
-                                    <td className="px-3 py-1.5 text-right text-slate-600 tabular-nums">{h2(row.overtimeNightPremiumHours)}</td>
-                                    <td className="px-3 py-1.5 text-right text-slate-600 tabular-nums">{h2(row.lateHr)}</td>
-                                    <td className="px-3 py-1.5 text-right text-slate-600 tabular-nums">{h2(row.undertimeHr)}</td>
+                                    <td className="px-3 py-1.5 text-right text-slate-600 tabular-nums">
+                                        {h2(row.regularHours)}
+                                    </td>
+                                    <td className="px-3 py-1.5 text-right text-slate-600 tabular-nums">
+                                        {h2(row.overtimeHours)}
+                                    </td>
+                                    <td className="px-3 py-1.5 text-right text-slate-600 tabular-nums">
+                                        {h2(row.nightPremiumHours)}
+                                    </td>
+                                    <td className="px-3 py-1.5 text-right text-slate-600 tabular-nums">
+                                        {h2(row.overtimeNightPremiumHours)}
+                                    </td>
+                                    <td className="px-3 py-1.5 text-right text-slate-600 tabular-nums">
+                                        {h2(row.lateHr)}
+                                    </td>
+                                    <td className="px-3 py-1.5 text-right text-slate-600 tabular-nums">
+                                        {h2(row.undertimeHr)}
+                                    </td>
                                     <td className="px-3 py-1.5 text-right font-medium text-slate-800 tabular-nums">
                                         {fmt(row.regularHoursPay)}
                                     </td>
@@ -1031,7 +1245,8 @@ const AttendanceBreakdown = ({ item }) => {
                                     (Number(r.nightPremiumHours) || 0),
                                 0,
                             ),
-                        )}h over {daysWorked} regular day
+                        )}
+                        h over {daysWorked} regular day
                         {daysWorked === 1 ? "" : "s"}
                     </p>
                 </div>
@@ -1047,9 +1262,9 @@ const AttendanceBreakdown = ({ item }) => {
 
             {Math.abs(basicPay - (Number(item.regularPay) || 0)) > 0.01 && (
                 <p className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                    These regular days add up to {fmt(basicPay)}, but the payroll
-                    records {fmt(item.regularPay)} as Regular Pay. The payroll was
-                    likely edited by hand after it was generated.
+                    These regular days add up to {fmt(basicPay)}, but the
+                    payroll records {fmt(item.regularPay)} as Regular Pay. The
+                    payroll was likely edited by hand after it was generated.
                 </p>
             )}
         </div>
@@ -1058,7 +1273,13 @@ const AttendanceBreakdown = ({ item }) => {
 
 // ─── payroll detail modal ───────────────────────────────────────────────────────
 
-const PayrollDetailModal = ({ payroll, types, editable, onClose, onUpdated }) => {
+const PayrollDetailModal = ({
+    payroll,
+    types,
+    editable,
+    onClose,
+    onUpdated,
+}) => {
     const [item, setItem] = useState(payroll);
 
     if (!item) return null;
@@ -1078,7 +1299,10 @@ const PayrollDetailModal = ({ payroll, types, editable, onClose, onUpdated }) =>
         { label: "Regular OT Pay", value: fmt(item.regularOTPay) },
         { label: "Holiday/Rest Day Pay", value: fmt(item.holidayRestDayPay) },
         { label: "Holiday/RD OT Pay", value: fmt(item.holidayRestDayOTPay) },
-        { label: "Night Differential Pay", value: fmt(item.nightDifferentialPay) },
+        {
+            label: "Night Differential Pay",
+            value: fmt(item.nightDifferentialPay),
+        },
         { label: "Absences", value: fmt(item.absences) },
         { label: "Late", value: fmt(item.late) },
         { label: "Undertime", value: fmt(item.undertime) },
@@ -1086,8 +1310,14 @@ const PayrollDetailModal = ({ payroll, types, editable, onClose, onUpdated }) =>
 
     const govFields = [
         { label: "SSS Contribution", value: fmt(item.sssContribution) },
-        { label: "PhilHealth Contribution", value: fmt(item.philhealthContribution) },
-        { label: "Pag-IBIG Contribution", value: fmt(item.pagibigContribution) },
+        {
+            label: "PhilHealth Contribution",
+            value: fmt(item.philhealthContribution),
+        },
+        {
+            label: "Pag-IBIG Contribution",
+            value: fmt(item.pagibigContribution),
+        },
         { label: "Withholding Tax", value: fmt(item.withholdingTax) },
     ];
 
@@ -1116,8 +1346,8 @@ const PayrollDetailModal = ({ payroll, types, editable, onClose, onUpdated }) =>
                     )}
                 </div>
                 <p className="text-sm text-slate-500 mb-5">
-                    {employeeName(item.compensation)} — {toDate(item.payrollFrom)} to{" "}
-                    {toDate(item.payrollTo)}
+                    {employeeName(item.compensation)} —{" "}
+                    {toDate(item.payrollFrom)} to {toDate(item.payrollTo)}
                 </p>
 
                 <div className="flex flex-col gap-6">
@@ -1136,7 +1366,11 @@ const PayrollDetailModal = ({ payroll, types, editable, onClose, onUpdated }) =>
                         </p>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3">
                             {attendanceFields.map((f) => (
-                                <InfoField key={f.label} label={f.label} value={f.value} />
+                                <InfoField
+                                    key={f.label}
+                                    label={f.label}
+                                    value={f.value}
+                                />
                             ))}
                         </div>
                     </div>
@@ -1154,7 +1388,11 @@ const PayrollDetailModal = ({ payroll, types, editable, onClose, onUpdated }) =>
                         </p>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3">
                             {govFields.map((f) => (
-                                <InfoField key={f.label} label={f.label} value={f.value} />
+                                <InfoField
+                                    key={f.label}
+                                    label={f.label}
+                                    value={f.value}
+                                />
                             ))}
                         </div>
                     </div>
@@ -1177,6 +1415,18 @@ const PayrollDetailModal = ({ payroll, types, editable, onClose, onUpdated }) =>
                                 editable={editable}
                             />
                             <RecordSection
+                                title="Charges"
+                                records={item.charges || []}
+                                types={types.chargeTypes}
+                                typeKey="chargeType"
+                                typeLabelKey="chargeName"
+                                endpoint="/charge-records"
+                                employeeId={employeeId}
+                                payrollId={item._id}
+                                onChanged={refresh}
+                                editable={editable}
+                            />
+                            <RecordSection
                                 title="Allowances"
                                 records={item.allowances || []}
                                 types={types.allowanceTypes}
@@ -1188,6 +1438,7 @@ const PayrollDetailModal = ({ payroll, types, editable, onClose, onUpdated }) =>
                                 onChanged={refresh}
                                 editable={editable}
                             />
+
                             <DeductionSection
                                 records={item.deductions || []}
                                 employeeId={employeeId}
@@ -1209,18 +1460,6 @@ const PayrollDetailModal = ({ payroll, types, editable, onClose, onUpdated }) =>
                                 onChanged={refresh}
                                 editable={editable}
                             />
-                            <RecordSection
-                                title="Charges"
-                                records={item.charges || []}
-                                types={types.chargeTypes}
-                                typeKey="chargeType"
-                                typeLabelKey="chargeName"
-                                endpoint="/charge-records"
-                                employeeId={employeeId}
-                                payrollId={item._id}
-                                onChanged={refresh}
-                                editable={editable}
-                            />
                         </div>
                     </div>
 
@@ -1230,7 +1469,11 @@ const PayrollDetailModal = ({ payroll, types, editable, onClose, onUpdated }) =>
                         </p>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3">
                             {totalFields.map((f) => (
-                                <InfoField key={f.label} label={f.label} value={f.value} />
+                                <InfoField
+                                    key={f.label}
+                                    label={f.label}
+                                    value={f.value}
+                                />
                             ))}
                         </div>
                     </div>
@@ -1257,15 +1500,25 @@ const fmtAmount = (val) =>
 
 const DeductPreview = ({ records, loading, canShow }) => {
     if (!canShow) return null;
-    if (loading) return <p className="text-xs text-slate-400 mt-1.5 ml-7">Loading…</p>;
+    if (loading)
+        return <p className="text-xs text-slate-400 mt-1.5 ml-7">Loading…</p>;
     if (records.length === 0)
-        return <p className="text-xs text-slate-400 italic mt-1.5 ml-7">No eligible records found.</p>;
+        return (
+            <p className="text-xs text-slate-400 italic mt-1.5 ml-7">
+                No eligible records found.
+            </p>
+        );
     return (
         <ul className="mt-1.5 ml-7 space-y-1">
             {records.map((r) => (
-                <li key={r._id} className="flex justify-between text-xs text-slate-600">
+                <li
+                    key={r._id}
+                    className="flex justify-between text-xs text-slate-600"
+                >
                     <span>{r.name}</span>
-                    <span className="text-slate-500 font-medium">{fmtAmount(r.currentAmount)}</span>
+                    <span className="text-slate-500 font-medium">
+                        {fmtAmount(r.currentAmount)}
+                    </span>
                 </li>
             ))}
         </ul>
@@ -1274,16 +1527,34 @@ const DeductPreview = ({ records, loading, canShow }) => {
 
 const LoanPreview = ({ records, loading, canShow }) => {
     if (!canShow) return null;
-    if (loading) return <p className="text-xs text-slate-400 mt-1.5 ml-7">Loading…</p>;
+    if (loading)
+        return <p className="text-xs text-slate-400 mt-1.5 ml-7">Loading…</p>;
     if (records.length === 0)
-        return <p className="text-xs text-slate-400 italic mt-1.5 ml-7">No ongoing loans found.</p>;
+        return (
+            <p className="text-xs text-slate-400 italic mt-1.5 ml-7">
+                No ongoing loans found.
+            </p>
+        );
     return (
         <ul className="mt-1.5 ml-7 space-y-1">
             {records.map((r) => (
-                <li key={r._id} className="flex justify-between text-xs text-slate-600">
-                    <span>{r.loanName}{r.loanType?.loanTypeName ? ` (${r.loanType.loanTypeName})` : ""}</span>
+                <li
+                    key={r._id}
+                    className="flex justify-between text-xs text-slate-600"
+                >
+                    <span>
+                        {r.loanName}
+                        {r.loanType?.loanTypeName
+                            ? ` (${r.loanType.loanTypeName})`
+                            : ""}
+                    </span>
                     <span className="text-slate-500 font-medium">
-                        {fmtAmount(Math.min(r.monthlyAmortization || 0, r.loanPayable || 0))}
+                        {fmtAmount(
+                            Math.min(
+                                r.monthlyAmortization || 0,
+                                r.loanPayable || 0,
+                            ),
+                        )}
                     </span>
                 </li>
             ))}
@@ -1293,15 +1564,25 @@ const LoanPreview = ({ records, loading, canShow }) => {
 
 const SavingsPreview = ({ records, loading, canShow }) => {
     if (!canShow) return null;
-    if (loading) return <p className="text-xs text-slate-400 mt-1.5 ml-7">Loading…</p>;
+    if (loading)
+        return <p className="text-xs text-slate-400 mt-1.5 ml-7">Loading…</p>;
     if (records.length === 0)
-        return <p className="text-xs text-slate-400 italic mt-1.5 ml-7">No active savings plan found.</p>;
+        return (
+            <p className="text-xs text-slate-400 italic mt-1.5 ml-7">
+                No active savings plan found.
+            </p>
+        );
     return (
         <ul className="mt-1.5 ml-7 space-y-1">
             {records.map((r) => (
-                <li key={r._id} className="flex justify-between text-xs text-slate-600">
+                <li
+                    key={r._id}
+                    className="flex justify-between text-xs text-slate-600"
+                >
                     <span>Target: {fmtAmount(r.savingsTarget)}</span>
-                    <span className="text-slate-500 font-medium">{fmtAmount(r.cutoffDeductionAmount)}</span>
+                    <span className="text-slate-500 font-medium">
+                        {fmtAmount(r.cutoffDeductionAmount)}
+                    </span>
                 </li>
             ))}
         </ul>
@@ -1312,8 +1593,12 @@ const ProcessPayrollModal = ({ onClose, onDone }) => {
     const [saving, setSaving] = useState(false);
     const [selectedComp, setSelectedComp] = useState(null);
     const [form, setForm] = useState({
-        payrollFrom: "", payrollTo: "", payrollDate: "",
-        autoDeductDeductions: false, autoDeductLoans: false, autoDeductSavings: false,
+        payrollFrom: "",
+        payrollTo: "",
+        payrollDate: "",
+        autoDeductDeductions: false,
+        autoDeductLoans: false,
+        autoDeductSavings: false,
         autoDeductLoanApplications: false,
     });
     const [deductionPreview, setDeductionPreview] = useState([]);
@@ -1321,7 +1606,10 @@ const ProcessPayrollModal = ({ onClose, onDone }) => {
     const [savingsPreview, setSavingsPreview] = useState([]);
     const [loanAppPreview, setLoanAppPreview] = useState([]);
     const [loadingPreview, setLoadingPreview] = useState({
-        deductions: false, loans: false, savings: false, loanApplications: false,
+        deductions: false,
+        loans: false,
+        savings: false,
+        loanApplications: false,
     });
 
     const set = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
@@ -1348,16 +1636,27 @@ const ProcessPayrollModal = ({ onClose, onDone }) => {
                 const to = new Date(form.payrollTo);
                 setDeductionPreview(
                     (data.deductionRecords || []).filter((r) => {
-                        const flat = !r.monthlyDeduction || Number(r.monthlyDeduction) === 0;
+                        const flat =
+                            !r.monthlyDeduction ||
+                            Number(r.monthlyDeduction) === 0;
                         const hasBalance = Number(r.currentAmount) > 0;
-                        const dateOk = !r.applicationDate || new Date(r.applicationDate) <= to;
+                        const dateOk =
+                            !r.applicationDate ||
+                            new Date(r.applicationDate) <= to;
                         return flat && hasBalance && dateOk;
                     }),
                 );
             })
-            .catch(() => { if (!cancelled) setDeductionPreview([]); })
-            .finally(() => { if (!cancelled) setLoadingPreview((p) => ({ ...p, deductions: false })); });
-        return () => { cancelled = true; };
+            .catch(() => {
+                if (!cancelled) setDeductionPreview([]);
+            })
+            .finally(() => {
+                if (!cancelled)
+                    setLoadingPreview((p) => ({ ...p, deductions: false }));
+            });
+        return () => {
+            cancelled = true;
+        };
     }, [form.autoDeductDeductions, employeeId, form.payrollTo]);
 
     useEffect(() => {
@@ -1372,18 +1671,27 @@ const ProcessPayrollModal = ({ onClose, onDone }) => {
             .then(({ data }) => {
                 if (cancelled) return;
                 const to = new Date(form.payrollTo);
-                setLoanPreview(+
-                    (data.deductionRecords || []).filter((r) => {
+                setLoanPreview(
+                    +(data.deductionRecords || []).filter((r) => {
                         const hasMonthly = Number(r.monthlyDeduction) > 0;
                         const hasBalance = Number(r.currentAmount) > 0;
-                        const dateOk = !r.applicationDate || new Date(r.applicationDate) <= to;
+                        const dateOk =
+                            !r.applicationDate ||
+                            new Date(r.applicationDate) <= to;
                         return hasMonthly && hasBalance && dateOk;
                     }),
                 );
             })
-            .catch(() => { if (!cancelled) setLoanPreview([]); })
-            .finally(() => { if (!cancelled) setLoadingPreview((p) => ({ ...p, loans: false })); });
-        return () => { cancelled = true; };
+            .catch(() => {
+                if (!cancelled) setLoanPreview([]);
+            })
+            .finally(() => {
+                if (!cancelled)
+                    setLoadingPreview((p) => ({ ...p, loans: false }));
+            });
+        return () => {
+            cancelled = true;
+        };
     }, [form.autoDeductLoans, employeeId, form.payrollTo]);
 
     useEffect(() => {
@@ -1400,13 +1708,22 @@ const ProcessPayrollModal = ({ onClose, onDone }) => {
                 const to = new Date(form.payrollTo);
                 setSavingsPreview(
                     (data.savings || []).filter((r) => {
-                        return !r.effectiveDate || new Date(r.effectiveDate) <= to;
+                        return (
+                            !r.effectiveDate || new Date(r.effectiveDate) <= to
+                        );
                     }),
                 );
             })
-            .catch(() => { if (!cancelled) setSavingsPreview([]); })
-            .finally(() => { if (!cancelled) setLoadingPreview((p) => ({ ...p, savings: false })); });
-        return () => { cancelled = true; };
+            .catch(() => {
+                if (!cancelled) setSavingsPreview([]);
+            })
+            .finally(() => {
+                if (!cancelled)
+                    setLoadingPreview((p) => ({ ...p, savings: false }));
+            });
+        return () => {
+            cancelled = true;
+        };
     }, [form.autoDeductSavings, employeeId, form.payrollTo]);
 
     useEffect(() => {
@@ -1417,7 +1734,9 @@ const ProcessPayrollModal = ({ onClose, onDone }) => {
         let cancelled = false;
         setLoadingPreview((p) => ({ ...p, loanApplications: true }));
         customFetch
-            .get(`/loan-applications?employee=${employeeId}&loanStatus=on going&limit=100`)
+            .get(
+                `/loan-applications?employee=${employeeId}&loanStatus=on going&limit=100`,
+            )
             .then(({ data }) => {
                 if (cancelled) return;
                 const to = new Date(form.payrollTo);
@@ -1431,11 +1750,19 @@ const ProcessPayrollModal = ({ onClose, onDone }) => {
                     }),
                 );
             })
-            .catch(() => { if (!cancelled) setLoanAppPreview([]); })
+            .catch(() => {
+                if (!cancelled) setLoanAppPreview([]);
+            })
             .finally(() => {
-                if (!cancelled) setLoadingPreview((p) => ({ ...p, loanApplications: false }));
+                if (!cancelled)
+                    setLoadingPreview((p) => ({
+                        ...p,
+                        loanApplications: false,
+                    }));
             });
-        return () => { cancelled = true; };
+        return () => {
+            cancelled = true;
+        };
     }, [form.autoDeductLoanApplications, employeeId, form.payrollTo]);
 
     const handleSubmit = async (e) => {
@@ -1456,7 +1783,9 @@ const ProcessPayrollModal = ({ onClose, onDone }) => {
             onDone();
         } catch (error) {
             toast.error(
-                error?.response?.data?.msg || error?.response?.data?.message || error.message,
+                error?.response?.data?.msg ||
+                    error?.response?.data?.message ||
+                    error.message,
             );
         } finally {
             setSaving(false);
@@ -1467,8 +1796,14 @@ const ProcessPayrollModal = ({ onClose, onDone }) => {
         <Overlay isOpen={true} onClose={onClose}>
             <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 max-h-[90vh] overflow-y-auto">
                 <div className="flex items-center justify-between mb-5">
-                    <h2 className="text-lg font-semibold text-slate-800">Process Payroll</h2>
-                    <button type="button" onClick={onClose} className="text-slate-400 hover:text-slate-600">
+                    <h2 className="text-lg font-semibold text-slate-800">
+                        Process Payroll
+                    </h2>
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="text-slate-400 hover:text-slate-600"
+                    >
                         <FiX size={18} />
                     </button>
                 </div>
@@ -1483,12 +1818,20 @@ const ProcessPayrollModal = ({ onClose, onDone }) => {
                     {selected && (
                         <div className="grid grid-cols-2 gap-3 text-sm bg-slate-50 rounded-lg px-4 py-3 border border-slate-100">
                             <div>
-                                <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-0.5">Daily Rate</p>
-                                <p className="font-medium text-slate-800">{fmt(selected.dailyRate)}</p>
+                                <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-0.5">
+                                    Daily Rate
+                                </p>
+                                <p className="font-medium text-slate-800">
+                                    {fmt(selected.dailyRate)}
+                                </p>
                             </div>
                             <div>
-                                <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-0.5">Monthly Rate</p>
-                                <p className="font-medium text-slate-800">{fmt(selected.monthlyRate)}</p>
+                                <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-0.5">
+                                    Monthly Rate
+                                </p>
+                                <p className="font-medium text-slate-800">
+                                    {fmt(selected.monthlyRate)}
+                                </p>
                             </div>
                         </div>
                     )}
@@ -1512,16 +1855,29 @@ const ProcessPayrollModal = ({ onClose, onDone }) => {
                             />
                         </Field>
                         <Field label="To">
-                            <input type="date" value={form.payrollTo} onChange={set("payrollTo")} required className={inputCls} />
+                            <input
+                                type="date"
+                                value={form.payrollTo}
+                                onChange={set("payrollTo")}
+                                required
+                                className={inputCls}
+                            />
                         </Field>
                     </div>
 
                     <Field label="Payroll Date">
-                        <input type="date" value={form.payrollDate} onChange={set("payrollDate")} className={inputCls} />
+                        <input
+                            type="date"
+                            value={form.payrollDate}
+                            onChange={set("payrollDate")}
+                            className={inputCls}
+                        />
                     </Field>
 
                     <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 flex flex-col gap-3">
-                        <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">Auto Deduct</p>
+                        <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+                            Auto Deduct
+                        </p>
 
                         <div>
                             <label className="flex items-center gap-3 cursor-pointer">
@@ -1532,13 +1888,18 @@ const ProcessPayrollModal = ({ onClose, onDone }) => {
                                     className="w-4 h-4 rounded border-slate-300 accent-slate-900"
                                 />
                                 <span className="text-sm text-slate-700">
-                                    Deductions <span className="text-xs text-slate-400">(flat / one-time)</span>
+                                    Deductions{" "}
+                                    <span className="text-xs text-slate-400">
+                                        (flat / one-time)
+                                    </span>
                                 </span>
                             </label>
                             <DeductPreview
                                 records={deductionPreview}
                                 loading={loadingPreview.deductions}
-                                canShow={form.autoDeductDeductions && canPreview}
+                                canShow={
+                                    form.autoDeductDeductions && canPreview
+                                }
                             />
                         </div>
 
@@ -1551,7 +1912,10 @@ const ProcessPayrollModal = ({ onClose, onDone }) => {
                                     className="w-4 h-4 rounded border-slate-300 accent-slate-900"
                                 />
                                 <span className="text-sm text-slate-700">
-                                    Loans <span className="text-xs text-slate-400">(monthly installments)</span>
+                                    Loans{" "}
+                                    <span className="text-xs text-slate-400">
+                                        (monthly installments)
+                                    </span>
                                 </span>
                             </label>
                             <DeductPreview
@@ -1570,7 +1934,10 @@ const ProcessPayrollModal = ({ onClose, onDone }) => {
                                     className="w-4 h-4 rounded border-slate-300 accent-slate-900"
                                 />
                                 <span className="text-sm text-slate-700">
-                                    Savings <span className="text-xs text-slate-400">(cutoff deduction)</span>
+                                    Savings{" "}
+                                    <span className="text-xs text-slate-400">
+                                        (cutoff deduction)
+                                    </span>
                                 </span>
                             </label>
                             <SavingsPreview
@@ -1585,32 +1952,53 @@ const ProcessPayrollModal = ({ onClose, onDone }) => {
                                 <input
                                     type="checkbox"
                                     checked={form.autoDeductLoanApplications}
-                                    onChange={toggle("autoDeductLoanApplications")}
+                                    onChange={toggle(
+                                        "autoDeductLoanApplications",
+                                    )}
                                     className="w-4 h-4 rounded border-slate-300 accent-slate-900"
                                 />
                                 <span className="text-sm text-slate-700">
-                                    Loan Applications <span className="text-xs text-slate-400">(amortization per loan)</span>
+                                    Loan Applications{" "}
+                                    <span className="text-xs text-slate-400">
+                                        (amortization per loan)
+                                    </span>
                                 </span>
                             </label>
                             <LoanPreview
                                 records={loanAppPreview}
                                 loading={loadingPreview.loanApplications}
-                                canShow={form.autoDeductLoanApplications && canPreview}
+                                canShow={
+                                    form.autoDeductLoanApplications &&
+                                    canPreview
+                                }
                             />
                         </div>
 
-                        {(form.autoDeductDeductions || form.autoDeductLoans || form.autoDeductSavings || form.autoDeductLoanApplications) && !canPreview && (
-                            <p className="text-xs text-slate-400 italic">
-                                Select an employee and set the payroll end date to preview eligible records.
-                            </p>
-                        )}
+                        {(form.autoDeductDeductions ||
+                            form.autoDeductLoans ||
+                            form.autoDeductSavings ||
+                            form.autoDeductLoanApplications) &&
+                            !canPreview && (
+                                <p className="text-xs text-slate-400 italic">
+                                    Select an employee and set the payroll end
+                                    date to preview eligible records.
+                                </p>
+                            )}
                     </div>
 
                     <div className="flex gap-3 pt-2">
-                        <button type="button" onClick={onClose} className="flex-1 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="flex-1 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50"
+                        >
                             Cancel
                         </button>
-                        <button type="submit" disabled={saving} className="flex-1 py-2 rounded-lg bg-slate-900 text-sm text-white hover:bg-slate-700 disabled:opacity-60">
+                        <button
+                            type="submit"
+                            disabled={saving}
+                            className="flex-1 py-2 rounded-lg bg-slate-900 text-sm text-white hover:bg-slate-700 disabled:opacity-60"
+                        >
                             {saving ? "Processing..." : "Process"}
                         </button>
                     </div>
@@ -1634,6 +2022,7 @@ const Payroll = () => {
         chargeTypes,
         clients,
     } = useLoaderData();
+    const { user } = useRouteLoaderData("dashboard");
     const [searchParams, setSearchParams] = useSearchParams();
     const revalidator = useRevalidator();
     const navigate = useNavigate();
@@ -1641,6 +2030,11 @@ const Payroll = () => {
     const [viewItem, setViewItem] = useState(null);
     const [processOpen, setProcessOpen] = useState(false);
     const { confirmModal, askConfirm } = useConfirm();
+
+    // Processing, editing and deleting a payroll are all the same resource, so
+    // one flag covers the three controls on this page. The linked-record
+    // sections inside a payroll are narrower and gate themselves.
+    const mayEdit = canWrite("payrolls", user?.role);
 
     const filterCompensation = searchParams.get("compensation") || "";
     const filterClient = searchParams.get("client") || "";
@@ -1677,17 +2071,22 @@ const Payroll = () => {
     };
 
     const handleDelete = (payroll) => {
-        askConfirm("Delete this payroll? Linked records will be unlinked, not destroyed.", async () => {
-            try {
-                await customFetch.delete(`/payrolls/${payroll._id}`);
-                toast.success("Payroll deleted");
-                revalidator.revalidate();
-            } catch (error) {
-                toast.error(
-                    error?.response?.data?.msg || error?.response?.data?.message || error.message,
-                );
-            }
-        });
+        askConfirm(
+            "Delete this payroll? Linked records will be unlinked, not destroyed.",
+            async () => {
+                try {
+                    await customFetch.delete(`/payrolls/${payroll._id}`);
+                    toast.success("Payroll deleted");
+                    revalidator.revalidate();
+                } catch (error) {
+                    toast.error(
+                        error?.response?.data?.msg ||
+                            error?.response?.data?.message ||
+                            error.message,
+                    );
+                }
+            },
+        );
     };
 
     const types = { earningTypes, allowanceTypes, deductionTypes, chargeTypes };
@@ -1698,16 +2097,22 @@ const Payroll = () => {
         <div>
             <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-800">Payroll</h1>
-                    <p className="text-slate-500 mt-1">Total: {totalPayrolls}</p>
+                    <h1 className="text-2xl font-bold text-slate-800">
+                        Payroll
+                    </h1>
+                    <p className="text-slate-500 mt-1">
+                        Total: {totalPayrolls}
+                    </p>
                 </div>
-                <button
-                    onClick={() => setProcessOpen(true)}
-                    className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-700 transition-colors"
-                >
-                    <FiPlus size={14} />
-                    Process Payroll
-                </button>
+                {mayEdit && (
+                    <button
+                        onClick={() => setProcessOpen(true)}
+                        className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-700 transition-colors"
+                    >
+                        <FiPlus size={14} />
+                        Process Payroll
+                    </button>
+                )}
             </div>
 
             {/* Filters */}
@@ -1732,7 +2137,9 @@ const Payroll = () => {
                         key={filterClient}
                         client={filterClient}
                         value={filterCompensation}
-                        onChange={(comp) => applyFilter("compensation", comp?._id ?? "")}
+                        onChange={(comp) =>
+                            applyFilter("compensation", comp?._id ?? "")
+                        }
                     />
                 </div>
                 <div className="flex flex-col gap-1">
@@ -1788,7 +2195,9 @@ const Payroll = () => {
                             <th className="px-4 py-3 text-left">#</th>
                             <th className="px-4 py-3 text-left">Employee</th>
                             <th className="px-4 py-3 text-left">Period</th>
-                            <th className="px-4 py-3 text-left">Payroll Date</th>
+                            <th className="px-4 py-3 text-left">
+                                Payroll Date
+                            </th>
                             <th className="px-4 py-3 text-right">Gross Pay</th>
                             <th className="px-4 py-3 text-right">Net Salary</th>
                             <th className="px-4 py-3 text-right">Final Pay</th>
@@ -1798,7 +2207,10 @@ const Payroll = () => {
                     <tbody className="divide-y divide-slate-100">
                         {payrolls.length === 0 && (
                             <tr>
-                                <td colSpan={8} className="px-4 py-8 text-center text-slate-400">
+                                <td
+                                    colSpan={8}
+                                    className="px-4 py-8 text-center text-slate-400"
+                                >
                                     No payrolls found.
                                 </td>
                             </tr>
@@ -1812,7 +2224,8 @@ const Payroll = () => {
                                     {employeeName(p.compensation)}
                                 </td>
                                 <td className="px-4 py-3 text-slate-600">
-                                    {toDate(p.payrollFrom)} – {toDate(p.payrollTo)}
+                                    {toDate(p.payrollFrom)} –{" "}
+                                    {toDate(p.payrollTo)}
                                 </td>
                                 <td className="px-4 py-3 text-slate-600">
                                     {toDate(p.payrollDate)}
@@ -1835,20 +2248,30 @@ const Payroll = () => {
                                         >
                                             <FiEye size={14} />
                                         </button>
-                                        <button
-                                            onClick={() => navigate(`/dashboard/payroll/${p._id}/edit`)}
-                                            className="text-blue-500 hover:text-blue-700"
-                                            title="Edit payroll"
-                                        >
-                                            <FiEdit2 size={14} />
-                                        </button>
-                                        <button
-                                            onClick={() => handleDelete(p)}
-                                            className="text-red-400 hover:text-red-600"
-                                            title="Delete payroll"
-                                        >
-                                            <FiTrash2 size={14} />
-                                        </button>
+                                        {mayEdit && (
+                                            <>
+                                                <button
+                                                    onClick={() =>
+                                                        navigate(
+                                                            `/dashboard/payroll/${p._id}/edit`,
+                                                        )
+                                                    }
+                                                    className="text-blue-500 hover:text-blue-700"
+                                                    title="Edit payroll"
+                                                >
+                                                    <FiEdit2 size={14} />
+                                                </button>
+                                                <button
+                                                    onClick={() =>
+                                                        handleDelete(p)
+                                                    }
+                                                    className="text-red-400 hover:text-red-600"
+                                                    title="Delete payroll"
+                                                >
+                                                    <FiTrash2 size={14} />
+                                                </button>
+                                            </>
+                                        )}
                                     </div>
                                 </td>
                             </tr>
@@ -1857,7 +2280,11 @@ const Payroll = () => {
                 </table>
             </div>
 
-            <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setPage} />
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setPage}
+            />
 
             {viewItem && (
                 <PayrollDetailModal

@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { redirect, useLoaderData, useRevalidator, useSearchParams } from "react-router-dom";
+import { redirect, useLoaderData, useRevalidator, useSearchParams, useRouteLoaderData } from "react-router-dom";
 import { toast } from "react-toastify";
 import { FiEdit2, FiEye, FiPlus, FiTrash2, FiX } from "react-icons/fi";
 import customFetch from "../../utils/customFetch";
 import { useConfirm, Pagination } from "../components";
+import { canWrite } from "../../../utils/permissions";
 
 export const loader = async ({ request }) => {
     try {
@@ -387,6 +388,11 @@ const Deductions = () => {
         currentPage,
         deductionTypes,
     } = useLoaderData();
+    const { user } = useRouteLoaderData("dashboard");
+
+    // Same resource the router checks, so the controls and the API agree.
+    // "View payments" stays for everyone -- it only reads.
+    const mayEdit = canWrite("deductionRecords", user?.role);
 
     const revalidator = useRevalidator();
     const [searchParams, setSearchParams] = useSearchParams();
@@ -464,13 +470,15 @@ const Deductions = () => {
                     <h1 className="text-2xl font-bold text-slate-800">Deduction Records</h1>
                     <p className="text-slate-500 mt-1">Total: {totalDeductionRecords}</p>
                 </div>
-                <button
-                    onClick={() => setModal("add")}
-                    className="flex items-center gap-2 py-2.5 px-4 text-sm text-white bg-slate-900 rounded-lg hover:bg-slate-700 transition-colors"
-                >
-                    <FiPlus size={14} />
-                    Add Record
-                </button>
+                {mayEdit && (
+                    <button
+                        onClick={() => setModal("add")}
+                        className="flex items-center gap-2 py-2.5 px-4 text-sm text-white bg-slate-900 rounded-lg hover:bg-slate-700 transition-colors"
+                    >
+                        <FiPlus size={14} />
+                        Add Record
+                    </button>
+                )}
             </div>
 
             {/* Filters */}
@@ -531,8 +539,12 @@ const Deductions = () => {
                                 </div>
                                 <div className="flex items-center gap-1 shrink-0">
                                     <button onClick={() => setViewRecord(rec)} className="p-2 rounded-lg text-blue-400 hover:text-blue-600 hover:bg-blue-50" title="View payments"><FiEye size={14} /></button>
-                                    <button onClick={() => setModal(rec)} className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100" title="Edit"><FiEdit2 size={14} /></button>
-                                    <button onClick={() => handleDelete(rec._id)} disabled={deleting === rec._id} className="p-2 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-40" title="Delete"><FiTrash2 size={14} /></button>
+                                    {mayEdit && (
+                                        <>
+                                        <button onClick={() => setModal(rec)} className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100" title="Edit"><FiEdit2 size={14} /></button>
+                                        <button onClick={() => handleDelete(rec._id)} disabled={deleting === rec._id} className="p-2 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-40" title="Delete"><FiTrash2 size={14} /></button>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-2 text-xs">
@@ -617,21 +629,25 @@ const Deductions = () => {
                                         >
                                             <FiEye size={14} />
                                         </button>
-                                        <button
-                                            onClick={() => setModal(rec)}
-                                            className="text-slate-400 hover:text-slate-700"
-                                            title="Edit"
-                                        >
-                                            <FiEdit2 size={14} />
-                                        </button>
-                                        <button
-                                            onClick={() => handleDelete(rec._id)}
-                                            disabled={deleting === rec._id}
-                                            className="text-red-400 hover:text-red-600 disabled:opacity-40"
-                                            title="Delete"
-                                        >
-                                            <FiTrash2 size={14} />
-                                        </button>
+                                        {mayEdit && (
+                                            <>
+                                            <button
+                                                onClick={() => setModal(rec)}
+                                                className="text-slate-400 hover:text-slate-700"
+                                                title="Edit"
+                                            >
+                                                <FiEdit2 size={14} />
+                                            </button>
+                                            <button
+                                                onClick={() => handleDelete(rec._id)}
+                                                disabled={deleting === rec._id}
+                                                className="text-red-400 hover:text-red-600 disabled:opacity-40"
+                                                title="Delete"
+                                            >
+                                                <FiTrash2 size={14} />
+                                            </button>
+                                            </>
+                                        )}
                                     </div>
                                 </td>
                             </tr>
