@@ -13,6 +13,7 @@ import LoanApplication from "../models/LoanApplication.js";
 import LoanPayment from "../models/LoanPayment.js";
 import ChargeRecord from "../models/ChargeRecord.js";
 import { NotFoundError } from "../errors/customErrors.js";
+import { LOAN_STATUS } from "../utils/constants.js";
 import { computePayroll } from "../utils/computePayroll.js";
 import { recomputePayrollTotals } from "../utils/recomputePayroll.js";
 import { syncPayrollAttendance } from "../utils/syncPayrollAttendance.js";
@@ -158,10 +159,17 @@ async function unlinkLoanPayments(paymentDocs) {
                     { $inc: { loanPayable: r2(payment.amount) } },
                     { new: true },
                 );
-                // Restore to ONGOING if loanPayable is now positive again
-                if (updated && updated.loanPayable > 0 && updated.loanStatus !== "on going") {
+                // Restore to ONGOING if loanPayable is now positive again --
+                // but only for a loan that closed by being paid off. One that
+                // was stopped by hand stays stopped, or deleting a payroll
+                // would quietly restart deductions someone had paused.
+                if (
+                    updated &&
+                    updated.loanPayable > 0 &&
+                    updated.loanStatus === LOAN_STATUS.FULLY_PAID
+                ) {
                     await LoanApplication.findByIdAndUpdate(updated._id, {
-                        loanStatus: "on going",
+                        loanStatus: LOAN_STATUS.ONGOING,
                     });
                 }
             }
@@ -171,9 +179,11 @@ async function unlinkLoanPayments(paymentDocs) {
 }
 
 async function generateLoanApplicationInstances(payrollId, employeeId, payrollTo) {
+    // Only "on going" loans are deducted, so a stopped one is skipped here
+    // and simply does not appear on the payroll until it is resumed.
     const activeLoans = await LoanApplication.find({
         employee: employeeId,
-        loanStatus: "on going",
+        loanStatus: LOAN_STATUS.ONGOING,
         isDeleted: "active",
         loanPayable: { $gt: 0 },
         $or: [

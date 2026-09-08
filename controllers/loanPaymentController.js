@@ -3,6 +3,7 @@ import LoanPayment from "../models/LoanPayment.js";
 import LoanApplication from "../models/LoanApplication.js";
 import { NotFoundError } from "../errors/customErrors.js";
 import { recomputePayrollTotals } from "../utils/recomputePayroll.js";
+import { LOAN_STATUS } from "../utils/constants.js";
 
 const r2 = (n) => Math.round(n * 100) / 100;
 
@@ -50,8 +51,14 @@ export const deleteLoanPayment = async (req, res) => {
             { $inc: { loanPayable: r2(loanPayment.amount) } },
             { new: true },
         );
-        if (updated && updated.loanPayable > 0 && updated.loanStatus !== "on going") {
-            await LoanApplication.findByIdAndUpdate(updated._id, { loanStatus: "on going" });
+        // Reversing a payment can take a loan back below its balance, so a
+        // loan that was closed off reopens. Only revive one that was closed by
+        // being paid off -- a loan someone stopped by hand stays stopped, or
+        // deleting a payment would quietly restart the deductions they paused.
+        if (updated && updated.loanPayable > 0 && updated.loanStatus === LOAN_STATUS.FULLY_PAID) {
+            await LoanApplication.findByIdAndUpdate(updated._id, {
+                loanStatus: LOAN_STATUS.ONGOING,
+            });
         }
     }
 

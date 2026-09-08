@@ -12,14 +12,14 @@ import {
     validateLoanApplicationParamId,
 } from "../middlewares/modelMiddlewares/loanApplicationValidations.js";
 import { authorizePermission } from "../middlewares/authMiddleware.js";
-import { USER_ROLES } from "../utils/constants.js";
+import { WRITE_ROLES } from "../utils/permissions.js";
 
 const router = Router();
 router
     .route("/")
     .get(getAllLoanApplications)
     .post(
-        authorizePermission(USER_ROLES.HR),
+        authorizePermission(...WRITE_ROLES.loanApplications),
         validateLoanApplicationInput,
         createLoanApplication,
     );
@@ -28,9 +28,9 @@ router
     .all(validateLoanApplicationParamId)
     .get(getLoanApplication)
     .patch(
-        authorizePermission(USER_ROLES.HR),
+        authorizePermission(...WRITE_ROLES.loanApplications),
         validateLoanApplicationUpdateInput,
         updateLoanApplication,
     )
-    .delete(authorizePermission(USER_ROLES.HR), deleteLoanApplication);
+    .delete(authorizePermission(...WRITE_ROLES.loanApplications), deleteLoanApplication);
 export default router;

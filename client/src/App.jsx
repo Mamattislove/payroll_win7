@@ -110,6 +110,20 @@ const router = createBrowserRouter([
                 path: "loans",
                 lazy: page(() => import("./pages/Loans")),
             },
+            // "loans/add" is a static segment, so the router ranks it above
+            // "loans/:id" regardless of the order they appear in here.
+            {
+                path: "loans/add",
+                lazy: page(() => import("./pages/AddLoan")),
+            },
+            {
+                path: "loans/:id",
+                lazy: page(() => import("./pages/ViewLoan")),
+            },
+            {
+                path: "loans/:id/edit",
+                lazy: page(() => import("./pages/EditLoan")),
+            },
             {
                 path: "savings",
                 lazy: page(() => import("./pages/Savings")),

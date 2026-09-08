@@ -40,6 +40,7 @@ export const WRITE_ROLES = {
     // its own resource rather than on one flag for the page.
     deductionRecords: [USER_ROLES.HR],
     deductionPayments: [USER_ROLES.ADMIN, USER_ROLES.HR],
+    loanApplications: [USER_ROLES.HR],
     loanPayments: [USER_ROLES.HR],
     savingsRecords: [USER_ROLES.HR],
 };

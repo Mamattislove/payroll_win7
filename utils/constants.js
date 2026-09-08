@@ -151,6 +151,11 @@ export const LOAN_CATEGORIES = {
 // LoanApplication.loan_status
 export const LOAN_STATUS = {
     ONGOING: "on going",
+    // Deductions are paused by hand: the balance still stands, but payroll
+    // skips the loan until someone resumes it. Only "on going" loans are
+    // picked up by generateLoanApplicationInstances, so stopping one is what
+    // keeps it out of the next cutoff.
+    STOPPED: "stopped",
     FULLY_PAID: "fully paid",
 };
 
