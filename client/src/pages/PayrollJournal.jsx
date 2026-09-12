@@ -918,22 +918,6 @@ const PayrollJournal = () => {
                             </tbody>
                         </table>
                     </div>
-                    <div className="mt-3 flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
-                        {report.rows.some((r) => r.imported) && (
-                            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                                <span className="font-semibold">*</span>{" "}
-                                {report.rows.filter((r) => r.imported).length}{" "}
-                                row(s) were imported from the previous system.
-                                Their totals are the figures actually paid, but
-                                the column breakdown behind them was not
-                                imported, so those rows may not add across.
-                            </p>
-                        )}
-                        <p className="text-xs text-slate-400 sm:text-right shrink-0">
-                            {report.rows.length} record
-                            {report.rows.length !== 1 ? "s" : ""}
-                        </p>
-                    </div>
                 </div>
             )}
         </>
