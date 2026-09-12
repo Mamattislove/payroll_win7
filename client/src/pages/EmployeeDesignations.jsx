@@ -10,6 +10,7 @@ import {
 import { toast } from "react-toastify";
 import { FiEdit2, FiTrash2, FiX } from "react-icons/fi";
 import customFetch from "../../utils/customFetch";
+import { EMPLOYMENT_STATUS } from "../../../utils/constants";
 import { fetchAllPages } from "../../utils/fetchAllPages";
 import { Overlay, useConfirm, Pagination } from "../components";
 
@@ -138,7 +139,14 @@ const EmployeeCombobox = ({ value, onChange, initialEmployee }) => {
         const timer = setTimeout(async () => {
             try {
                 const { data } = await customFetch.get("/employees", {
-                    params: { search: query, limit: 20 },
+                    // Inactive employees are kept for their history but
+                    // should never be offered as a choice: nearly half the
+                    // roster is inactive, so they bury the current staff.
+                    params: {
+                        search: query,
+                        limit: 20,
+                        status: EMPLOYMENT_STATUS.ACTIVE,
+                    },
                 });
                 if (!cancelled) setResults(data.employees || []);
             } finally {

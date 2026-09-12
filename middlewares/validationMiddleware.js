@@ -99,6 +99,28 @@ export const validateUserUpdateInput = withValidationErrors([
         .withMessage("invalid role"),
 ]);
 
+// Self-service change, as opposed to the admin reset below. The current
+// password is required so that an unattended signed-in browser cannot be used
+// to take the account over -- the admin reset deliberately skips that, because
+// an admin resetting someone else's password does not know it.
+export const validatePasswordChangeInput = withValidationErrors([
+    body("currentPassword")
+        .notEmpty()
+        .withMessage("current password is required"),
+    body("newPassword")
+        .notEmpty()
+        .withMessage("new password is required")
+        .isLength({ min: 8 })
+        .withMessage("new password must be at least 8 characters")
+        .custom((newPassword, { req }) => newPassword !== req.body.currentPassword)
+        .withMessage("new password must be different from the current one"),
+    body("confirmPassword")
+        .notEmpty()
+        .withMessage("confirm password is required")
+        .custom((confirmPassword, { req }) => confirmPassword === req.body.newPassword)
+        .withMessage("new password and confirm password are not equal"),
+]);
+
 export const validatePasswordResetInput = withValidationErrors([
     body("password")
         .notEmpty()

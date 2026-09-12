@@ -1,5 +1,9 @@
 import { NavLink } from "react-router-dom";
-import { IoCloseOutline, IoLogOutOutline } from "react-icons/io5";
+import {
+    IoCloseOutline,
+    IoKeyOutline,
+    IoLogOutOutline,
+} from "react-icons/io5";
 import {
     MdDashboard,
     MdPeople,
@@ -233,6 +237,14 @@ const Sidebar = ({ user, isOpen, onClose }) => {
                         {user?.role}
                     </p>
                 </div>
+                <NavLink
+                    to="/dashboard/change-password"
+                    onClick={onClose}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-slate-800 transition-colors"
+                >
+                    <IoKeyOutline className="text-base" />
+                    Change Password
+                </NavLink>
                 <button
                     onClick={handleLogout}
                     className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm text-red-400 hover:bg-red-500/10 transition-colors"

@@ -100,7 +100,10 @@ export const getAllAttendances = async (req, res) => {
         })
         .sort({ attendanceDate: sort === "asc" ? 1 : -1 })
         .skip(skip)
-        .limit(limitNum);
+        .limit(limitNum)
+        // Same reasoning as getAllPayrolls: the payslip and billing screens
+        // pull thousands of these rows and only serialise them.
+        .lean();
 
     res.status(StatusCodes.OK).json({
         totalAttendances,

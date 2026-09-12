@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import {
     redirect,
     useLoaderData,
@@ -7,22 +7,16 @@ import {
 } from "react-router-dom";
 import { toast } from "react-toastify";
 import {
-    FiPlus,
     FiEdit2,
     FiTrash2,
     FiChevronUp,
     FiChevronDown,
     FiSun,
     FiMoon,
-    FiX,
 } from "react-icons/fi";
 import customFetch from "../../utils/customFetch";
 import { Overlay, InfoField, useConfirm, Pagination } from "../components";
-import {
-    DAY_TYPES,
-    HOLIDAY_TYPES,
-    EMPLOYMENT_STATUS,
-} from "../../../utils/constants";
+import { DAY_TYPES, HOLIDAY_TYPES } from "../../../utils/constants";
 
 export const loader = async ({ request }) => {
     try {
@@ -143,134 +137,6 @@ const SHORTCUT_CONFIGS = [
 
 // Searches compensations server-side (`/compensations?search=`) instead of
 // filtering a preloaded list — with 2000+ compensations (each with a deep
-// employee/client/department/position populate), loading them all up front
-// made this page slow to load.
-const EmployeeCombobox = ({ value, onChange }) => {
-    const [query, setQuery] = useState("");
-    const [open, setOpen] = useState(false);
-    const [results, setResults] = useState([]);
-    const [loading, setLoading] = useState(false);
-    const [selected, setSelected] = useState(null);
-    const containerRef = useRef(null);
-
-    useEffect(() => {
-        if (!open) return;
-        let cancelled = false;
-        setLoading(true);
-        const timer = setTimeout(async () => {
-            try {
-                const { data } = await customFetch.get("/compensations", {
-                    params: {
-                        search: query,
-                        limit: 20,
-                        employeeStatus: EMPLOYMENT_STATUS.ACTIVE,
-                    },
-                });
-                if (!cancelled) setResults(data.compensations || []);
-            } finally {
-                if (!cancelled) setLoading(false);
-            }
-        }, 300);
-        return () => {
-            cancelled = true;
-            clearTimeout(timer);
-        };
-    }, [query, open]);
-
-    const handleSelect = (comp) => {
-        setSelected(comp);
-        onChange(comp._id);
-        setQuery("");
-        setOpen(false);
-    };
-    const handleClear = () => {
-        setSelected(null);
-        onChange("");
-        setQuery("");
-    };
-
-    useEffect(() => {
-        const handler = (e) => {
-            if (
-                containerRef.current &&
-                !containerRef.current.contains(e.target)
-            ) {
-                setOpen(false);
-                setQuery("");
-            }
-        };
-        document.addEventListener("mousedown", handler);
-        return () => document.removeEventListener("mousedown", handler);
-    }, []);
-
-    const displayValue = open ? query : selected ? employeeName(selected) : "";
-
-    return (
-        <div ref={containerRef} className="relative w-full">
-            <div className="relative">
-                <input
-                    type="text"
-                    value={displayValue}
-                    onChange={(e) => {
-                        setQuery(e.target.value);
-                        setOpen(true);
-                    }}
-                    onFocus={() => setOpen(true)}
-                    placeholder="Search employee…"
-                    className={`${inputCls} pr-8`}
-                    autoComplete="off"
-                />
-                {selected && !open && (
-                    <button
-                        type="button"
-                        onClick={handleClear}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                        title="Clear"
-                    >
-                        <FiX size={14} />
-                    </button>
-                )}
-            </div>
-            {open && (
-                <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                    {loading ? (
-                        <p className="px-3 py-2.5 text-sm text-slate-400">
-                            Searching…
-                        </p>
-                    ) : results.length === 0 ? (
-                        <p className="px-3 py-2.5 text-sm text-slate-400">
-                            No employees found.
-                        </p>
-                    ) : (
-                        results.map((c) => {
-                            const code =
-                                c.employeeDesignation?.employee?.employeeCode;
-                            return (
-                                <button
-                                    key={c._id}
-                                    type="button"
-                                    onMouseDown={(e) => e.preventDefault()}
-                                    onClick={() => handleSelect(c)}
-                                    className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between gap-2 hover:bg-slate-50 ${value === c._id ? "bg-slate-50 font-semibold" : ""}`}
-                                >
-                                    <span className="text-slate-800 truncate">
-                                        {employeeName(c)}
-                                    </span>
-                                    {code && (
-                                        <span className="text-slate-400 text-xs shrink-0">
-                                            {code}
-                                        </span>
-                                    )}
-                                </button>
-                            );
-                        })
-                    )}
-                </div>
-            )}
-        </div>
-    );
-};
-
 const fmt = (val) =>
     val !== undefined && val !== null
         ? `₱${Number(val).toLocaleString("en-PH", { minimumFractionDigits: 2 })}`
@@ -348,31 +214,21 @@ const AttendanceModal = ({ modal, holidayMap, onClose, onSaved }) => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (modal.mode === "add" && !form.compensation) {
-            toast.error("Select an employee");
-            return;
-        }
         setSaving(true);
         try {
             const body = {};
             for (const [key, value] of Object.entries(form)) {
                 if (value === "" || value === null || value === undefined)
                     continue;
-                if (
-                    modal.mode === "edit" &&
-                    (key === "compensation" || key === "attendanceDate")
-                )
+                // Neither can be corrected on an existing record: the
+                // pair is the unique key the attendance is stored under.
+                if (key === "compensation" || key === "attendanceDate")
                     continue;
                 body[key] = numberFields.includes(key) ? Number(value) : value;
             }
 
-            if (modal.mode === "add") {
-                await customFetch.post("/attendances", body);
-                toast.success("Attendance recorded");
-            } else {
-                await customFetch.patch(`/attendances/${att._id}`, body);
-                toast.success("Attendance updated");
-            }
+            await customFetch.patch(`/attendances/${att._id}`, body);
+            toast.success("Attendance updated");
             onSaved();
         } catch (error) {
             toast.error(
@@ -389,27 +245,16 @@ const AttendanceModal = ({ modal, holidayMap, onClose, onSaved }) => {
         <Overlay isOpen={true} onClose={onClose}>
             <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
                 <h2 className="text-lg font-semibold text-slate-800 mb-4">
-                    {modal.mode === "add"
-                        ? "Add Attendance"
-                        : "Edit Attendance"}
+                    Edit Attendance
                 </h2>
                 <form onSubmit={handleSubmit} className="flex flex-col gap-4">
                     <Field label="Employee / Compensation">
-                        {modal.mode === "add" ? (
-                            <EmployeeCombobox
-                                value={form.compensation}
-                                onChange={(val) =>
-                                    setField("compensation", val)
-                                }
-                            />
-                        ) : (
-                            <input
-                                type="text"
-                                value={employeeName(att?.compensation)}
-                                disabled
-                                className={`${inputCls} bg-slate-100 text-slate-400`}
-                            />
-                        )}
+                        <input
+                            type="text"
+                            value={employeeName(att?.compensation)}
+                            disabled
+                            className={`${inputCls} bg-slate-100 text-slate-400`}
+                        />
                     </Field>
 
                     <div className="grid grid-cols-2 gap-3">
@@ -420,9 +265,9 @@ const AttendanceModal = ({ modal, holidayMap, onClose, onSaved }) => {
                                 onChange={(e) =>
                                     handleDateChange(e.target.value)
                                 }
-                                disabled={modal.mode === "edit"}
+                                disabled
                                 required
-                                className={`${inputCls} ${modal.mode === "edit" ? "bg-slate-100 text-slate-400" : ""}`}
+                                className={`${inputCls} bg-slate-100 text-slate-400`}
                             />
                         </Field>
                         <Field label="Day Type">
@@ -793,13 +638,6 @@ const Attendance = () => {
                         Total records: {totalAttendances}
                     </p>
                 </div>
-                <button
-                    onClick={() => setModal({ mode: "add" })}
-                    className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-700 transition-colors"
-                >
-                    <FiPlus size={14} />
-                    Add Attendance
-                </button>
             </div>
 
             {/* Filters */}
@@ -903,10 +741,7 @@ const Attendance = () => {
                                     </button>
                                     <button
                                         onClick={() =>
-                                            setModal({
-                                                mode: "edit",
-                                                attendance: att,
-                                            })
+                                            setModal({ attendance: att })
                                         }
                                         className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
                                     >
@@ -1035,10 +870,7 @@ const Attendance = () => {
                                             </button>
                                             <button
                                                 onClick={() =>
-                                                    setModal({
-                                                        mode: "edit",
-                                                        attendance: att,
-                                                    })
+                                                    setModal({ attendance: att })
                                                 }
                                                 className="text-slate-400 hover:text-slate-700"
                                                 title="Edit"
@@ -1070,11 +902,7 @@ const Attendance = () => {
             />
 
             <AttendanceModal
-                key={
-                    modal
-                        ? `${modal.mode}-${modal.attendance?._id ?? "new"}`
-                        : "closed"
-                }
+                key={modal?.attendance?._id ?? "closed"}
                 modal={modal}
                 holidayMap={holidayMap}
                 onClose={closeModal}

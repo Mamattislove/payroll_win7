@@ -96,4 +96,16 @@ const payrollSchema = new mongoose.Schema(
     { timestamps: true },
 );
 
+// Every lookup in the system finds payrolls either for one compensation or for
+// a date range, and both were full collection scans until these existed. The
+// duplicate check that runs once per employee when a payroll is generated read
+// all 8,000+ documents each time, which a per-client batch would have
+// multiplied by the size of the client.
+payrollSchema.index({ compensation: 1, payrollFrom: -1 });
+
+// Reports and the payslip period list filter on the period and sort newest
+// first; without this the sort is done in memory, and MongoDB aborts an
+// unindexed sort once it exceeds 32MB.
+payrollSchema.index({ payrollFrom: -1, payrollTo: 1 });
+
 export default mongoose.model("Payroll", payrollSchema);

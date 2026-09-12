@@ -80,6 +80,11 @@ function buildRows(payrolls) {
             const netPay    = p.netSalary || p.finalPay || 0;
 
             return {
+                // Payrolls brought over from the previous system carry the
+                // totals it calculated, with no component records behind
+                // them, so their columns do not always foot. Marked rather
+                // than corrected: those figures are what was actually paid.
+                imported: !!p.legacyPayslipId,
                 code: emp?.employeeCode || "—",
                 name: emp ? `${emp.lastName}, ${emp.firstName}` : "—",
                 dailyRate,
@@ -149,6 +154,7 @@ const S = StyleSheet.create({
     tdOdd:    { backgroundColor: "#f4f7fb" },
     tdR:      { fontSize: 6, textAlign: "right" },
     tdL:      { fontSize: 6, textAlign: "left" },
+    importedNote: { fontSize: 6, marginTop: 6, color: "#92400e" },
     tdC:      { fontSize: 5.5, textAlign: "center", color: "#64748b" },
     gt:       { backgroundColor: "#1e3a5f" },
     gtLabel:  { color: "#ffffff", fontFamily: "Helvetica-Bold", fontSize: 6 },
@@ -210,7 +216,7 @@ const JournalPDF = ({ report }) => {
                     return (
                         <View key={i} style={S.row}>
                             <View style={[S.td, bg, { width: W.num  }]}><Text style={S.tdC}>{i + 1}</Text></View>
-                            <View style={[S.td, bg, { width: W.code }]}><Text style={S.tdC}>{row.code}</Text></View>
+                            <View style={[S.td, bg, { width: W.code }]}><Text style={S.tdC}>{row.code}{row.imported ? "*" : ""}</Text></View>
                             <View style={[S.td, bg, { flex: 1       }]}><Text style={S.tdL}>{row.name}</Text></View>
                             <View style={[S.td, bg, { width: W.rate }]}><Text style={S.tdR}>{f2(row.dailyRate)}</Text></View>
                             <View style={[S.td, bg, { width: W.basic}]}><Text style={S.tdR}>{f2(row.basicPay)}</Text></View>
@@ -255,6 +261,17 @@ const JournalPDF = ({ report }) => {
                     <View style={[S.td, S.gt, { width: W.net  }]}><Text style={S.gtAmt}>{f2(t.netPay)}</Text></View>
                     <View style={[S.td, S.gt, { width: W.sig  }]}><Text style={S.gtLabel}> </Text></View>
                 </View>
+
+                {/* The printed journal is the accounting record, so the reason
+                    some rows do not add across belongs on the page itself. */}
+                {rows.some((r) => r.imported) && (
+                    <Text style={S.importedNote}>
+                        * {rows.filter((r) => r.imported).length} row(s) imported from the
+                        previous system. Their totals are the figures actually paid; the
+                        column breakdown behind them was not imported, so those rows may
+                        not add across.
+                    </Text>
+                )}
             </Page>
         </Document>
     );
@@ -276,7 +293,10 @@ const JournalRow = ({ row, idx }) => {
     return (
         <tr className={bg}>
             <td className={`${tdc} font-semibold text-slate-400`}>{idx + 1}</td>
-            <td className={tdc}>{row.code}</td>
+            <td className={tdc}>
+                {row.code}
+                {row.imported && <span title="Imported from the previous system">*</span>}
+            </td>
             <td className="px-2 py-1 text-[10px] font-semibold border border-slate-200 whitespace-nowrap">{row.name}</td>
             <td className={td}>{f2(row.dailyRate)}</td>
             <td className={td}>{f2(row.basicPay)}</td>
@@ -396,7 +416,7 @@ const PayrollJournal = () => {
 
         const n = (v) => Math.round((Number(v) || 0) * 100) / 100;
         const body = report.rows.map((r, i) => [
-            i + 1, r.code, r.name, n(r.dailyRate), n(r.basicPay), n(r.days),
+            i + 1, r.code + (r.imported ? "*" : ""), r.name, n(r.dailyRate), n(r.basicPay), n(r.days),
             n(r.otHolSun), n(r.nd), n(r.leaveSil), n(r.allowances),
             n(r.gross), n(r.sss), n(r.ph), n(r.hdmf), n(r.sssLoan),
             n(r.hdmfLoan), n(r.tax), n(r.deductions), n(r.netPay),
@@ -568,9 +588,20 @@ const PayrollJournal = () => {
                             </tbody>
                         </table>
                     </div>
-                    <p className="mt-3 text-xs text-slate-400 text-right">
-                        {report.rows.length} record{report.rows.length !== 1 ? "s" : ""}
-                    </p>
+                    <div className="mt-3 flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                        {report.rows.some((r) => r.imported) && (
+                            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                                <span className="font-semibold">*</span>{" "}
+                                {report.rows.filter((r) => r.imported).length} row(s) were
+                                imported from the previous system. Their totals are the
+                                figures actually paid, but the column breakdown behind them
+                                was not imported, so those rows may not add across.
+                            </p>
+                        )}
+                        <p className="text-xs text-slate-400 sm:text-right shrink-0">
+                            {report.rows.length} record{report.rows.length !== 1 ? "s" : ""}
+                        </p>
+                    </div>
                 </div>
             )}
         </>

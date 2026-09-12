@@ -12,8 +12,9 @@ import SavingsPayment from "../models/SavingsPayment.js";
 import LoanApplication from "../models/LoanApplication.js";
 import LoanPayment from "../models/LoanPayment.js";
 import ChargeRecord from "../models/ChargeRecord.js";
-import { NotFoundError } from "../errors/customErrors.js";
-import { LOAN_STATUS } from "../utils/constants.js";
+import { NotFoundError, BadRequestError } from "../errors/customErrors.js";
+import { LOAN_STATUS, COMPENSATION_STATUS } from "../utils/constants.js";
+import { existingCompensation } from "../middlewares/existingMiddleware.js";
 import { computePayroll } from "../utils/computePayroll.js";
 import { recomputePayrollTotals } from "../utils/recomputePayroll.js";
 import { syncPayrollAttendance } from "../utils/syncPayrollAttendance.js";
@@ -178,6 +179,18 @@ async function unlinkLoanPayments(paymentDocs) {
     );
 }
 
+/**
+ * True for the second cutoff of the month — the period starting on the 16th.
+ *
+ * Every payroll period in the system starts on either the 1st or the 16th, so
+ * the day of the month is enough to tell the two apart without inspecting the
+ * compensation's payroll period. Dates are stored at UTC midnight, hence
+ * getUTCDate rather than getDate, which would shift the day in some zones.
+ */
+function isSecondCutoff(payrollFrom) {
+    return new Date(payrollFrom).getUTCDate() >= 16;
+}
+
 async function generateLoanApplicationInstances(payrollId, employeeId, payrollTo) {
     // Only "on going" loans are deducted, so a stopped one is skipped here
     // and simply does not appear on the payroll until it is resumed.
@@ -297,6 +310,20 @@ export const getPayrollPeriods = async (req, res) => {
     });
 };
 
+/*
+ * A hydrated Mongoose document materialises a missing array path as [], but a
+ * .lean() one leaves it undefined -- and 85% of payrolls have never had a
+ * loans/savings/charges field written at all. Restoring the empty arrays keeps
+ * the response shape exactly as it was before these reads went lean, so no
+ * caller has to learn the difference.
+ */
+const RECORD_ARRAYS = ["attendance", "earning", "allowances", "deductions", "savings", "loans", "charges"];
+
+const withEmptyRecordArrays = (payroll) => {
+    for (const key of RECORD_ARRAYS) if (!payroll[key]) payroll[key] = [];
+    return payroll;
+};
+
 export const getAllPayrolls = async (req, res) => {
     const { page = 1, limit = 10, compensation, from, to, payrollFrom, payrollTo, client } = req.query;
 
@@ -361,13 +388,19 @@ export const getAllPayrolls = async (req, res) => {
         })
         .sort({ payrollFrom: -1 })
         .skip(skip)
-        .limit(limitNum);
+        .limit(limitNum)
+        // Reports read these straight through to JSON and never call a document
+        // method on them, so hydrating full Mongoose documents is pure cost --
+        // it roughly doubled the time for a cutoff's worth of rows. Safe here
+        // because nothing in this populate chain has a virtual, getter or
+        // toJSON transform (User does, and is deliberately not populated).
+        .lean();
 
     res.status(StatusCodes.OK).json({
         totalPayrolls,
         totalPages,
         currentPage: pageNum,
-        payrolls,
+        payrolls: payrolls.map(withEmptyRecordArrays),
     });
 };
 
@@ -375,23 +408,33 @@ export const getPayroll = (req, res) => {
     res.status(StatusCodes.OK).json({ payroll: req.payroll });
 };
 
-export const createPayroll = async (req, res) => {
-    const { dailyRate } = req.compensation;
-    const {
-        compensation,
+/**
+ * Generates one payroll for one compensation and returns it with its totals
+ * settled.
+ *
+ * Shared by the single-employee endpoint and the per-client batch so the two
+ * cannot drift: a payroll generated in a batch is byte-for-byte the same
+ * record as one generated on its own.
+ *
+ * `compensationDoc` must be populated the way existingCompensation populates
+ * it -- the employee is read off employeeDesignation, and the contribution
+ * bases off the compensation itself.
+ */
+async function generatePayrollFor(
+    compensationDoc,
+    {
         payrollFrom,
         payrollTo,
+        payrollFields = {},
+        attendanceIds,
         autoDeductDeductions = false,
         autoDeductLoans = false,
         autoDeductSavings = false,
-        autoDeductLoanApplications = false,
-        attendance: attendanceIds,
-        earnings = [],
-        allowances = [],
-        deductions = [],
-        charges = [],
-        ...payrollFields
-    } = req.body;
+        links = null,
+    },
+) {
+    const compensation = compensationDoc._id;
+    const { dailyRate } = compensationDoc;
 
     const attendances =
         attendanceIds?.length > 0
@@ -426,12 +469,12 @@ export const createPayroll = async (req, res) => {
         sssEmployerContribution: rawSssEmp,
         philhealthEmployerContribution: rawPhEmp,
         pagibigEmployerContribution: rawPiEmp,
-    } = await computeGovContributions(req.compensation, year);
+    } = await computeGovContributions(compensationDoc, year);
 
     // Government contributions are monthly obligations, so each run deducts
     // only its share of the month (see utils/contributionFactor.js).
     const factor = contributionFactor(
-        req.compensation.payrollPeriod,
+        compensationDoc.payrollPeriod,
         payrollFrom,
     );
     const sssContribution = r2(rawSss * factor);
@@ -467,8 +510,8 @@ export const createPayroll = async (req, res) => {
     });
 
     const employeeId =
-        req.compensation.employeeDesignation?.employee?._id ??
-        req.compensation.employeeDesignation?.employee;
+        compensationDoc.employeeDesignation?.employee?._id ??
+        compensationDoc.employeeDesignation?.employee;
 
     const unlinked = { payroll: null, employee: employeeId };
 
@@ -488,15 +531,233 @@ export const createPayroll = async (req, res) => {
     if (autoDeductSavings) {
         await generateSavingsInstances(payroll._id, employeeId, payrollTo);
     }
-    if (autoDeductLoanApplications) {
+    // Loan amortisation is a monthly figure, so it comes off once a month
+    // rather than on both cutoffs — on the second one. This is already how the
+    // office runs it by hand (loans appear on 31% of second-cutoff payrolls and
+    // on none of the first-cutoff ones); making it a rule means it no longer
+    // depends on anyone remembering, and it is why the modal no longer asks.
+    //
+    // Re-running a period cannot double-charge: the create validator refuses a
+    // second payroll for the same compensation and period, and deleting one
+    // hands the amortisation back through unlinkLoanPayments.
+    if (isSecondCutoff(payrollFrom)) {
         await generateLoanApplicationInstances(payroll._id, employeeId, payrollTo);
     }
 
-    // Link any records explicitly selected by id from the form
-    await linkRecords(payroll._id, { earnings, allowances, deductions, charges });
+    // Link any records explicitly selected by id from the form. A batch run
+    // picks nothing by hand, so it passes no links at all.
+    if (links) await linkRecords(payroll._id, links);
 
-    const updated = await recomputePayrollTotals(payroll._id);
-    res.status(StatusCodes.CREATED).json({ payroll: updated });
+    return recomputePayrollTotals(payroll._id);
+}
+
+export const createPayroll = async (req, res) => {
+    const {
+        // Read off req.compensation instead, which the validator has already
+        // loaded and populated; destructured here only to keep it out of
+        // payrollFields and off the payroll document.
+        compensation: _compensation,
+        payrollFrom,
+        payrollTo,
+        autoDeductDeductions = false,
+        autoDeductLoans = false,
+        autoDeductSavings = false,
+        // Still destructured so an old client sending it cannot have it swept
+        // into payrollFields and written onto the document, but no longer
+        // consulted: loans follow the second-cutoff rule instead.
+        autoDeductLoanApplications: _autoDeductLoanApplications = false,
+        attendance: attendanceIds,
+        earnings = [],
+        allowances = [],
+        deductions = [],
+        charges = [],
+        ...payrollFields
+    } = req.body;
+
+    const payroll = await generatePayrollFor(req.compensation, {
+        payrollFrom,
+        payrollTo,
+        payrollFields,
+        attendanceIds,
+        autoDeductDeductions,
+        autoDeductLoans,
+        autoDeductSavings,
+        links: { earnings, allowances, deductions, charges },
+    });
+
+    res.status(StatusCodes.CREATED).json({ payroll });
+};
+
+/*
+ * ── Per-client batch generation ──────────────────────────────────────────────
+ *
+ * Two steps on purpose. The preview answers "who would this touch, and what is
+ * wrong with any of them" without writing anything; the batch then generates
+ * exactly the compensations the encoder ticked. Handing a client id straight to
+ * a generate button would create hundreds of payrolls sight unseen -- and for
+ * a client whose timekeeping is not in yet, most of them would be empty.
+ */
+
+const BATCH_STATUS = {
+    READY: "ready",
+    NO_ATTENDANCE: "no-attendance",
+    ALREADY_GENERATED: "already-generated",
+};
+
+/** Active compensations for a client, with the employee populated for display. */
+async function clientCompensations(client) {
+    const designations = await EmployeeDesignation.find({ client }).select("_id");
+    return Compensation.find({
+        employeeDesignation: { $in: designations.map((d) => d._id) },
+        activeStatus: COMPENSATION_STATUS.ACTIVE,
+    })
+        .populate({
+            path: "employeeDesignation",
+            populate: [
+                { path: "employee", select: "firstName lastName employeeCode" },
+                { path: "client", select: "clientName" },
+            ],
+        })
+        .sort({ createdAt: 1 });
+}
+
+export const getBatchPreview = async (req, res) => {
+    const { client, payrollFrom, payrollTo } = req.query;
+    if (!client || !payrollFrom || !payrollTo)
+        throw new BadRequestError(
+            "client, payrollFrom and payrollTo are all required",
+        );
+
+    const from = utcDayStart(payrollFrom);
+    const to = utcDayEnd(payrollTo);
+
+    const compensations = await clientCompensations(client);
+    const compIds = compensations.map((c) => c._id);
+
+    // Two grouped reads rather than a query per employee: attendance in the
+    // period, and payrolls that already exist for it.
+    const [attendance, existing] = await Promise.all([
+        Attendance.aggregate([
+            {
+                $match: {
+                    compensation: { $in: compIds },
+                    attendanceDate: { $gte: from, $lte: to },
+                },
+            },
+            {
+                $group: {
+                    _id: "$compensation",
+                    days: { $sum: 1 },
+                    hours: { $sum: { $ifNull: ["$regularHours", 0] } },
+                },
+            },
+        ]),
+        Payroll.find({
+            compensation: { $in: compIds },
+            payrollFrom: utcDayStart(payrollFrom),
+        }).select("compensation"),
+    ]);
+
+    const attendanceBy = new Map(attendance.map((a) => [String(a._id), a]));
+    const generated = new Set(existing.map((p) => String(p.compensation)));
+
+    const rows = compensations.map((comp) => {
+        const key = String(comp._id);
+        const att = attendanceBy.get(key);
+        const employee = comp.employeeDesignation?.employee;
+        const status = generated.has(key)
+            ? BATCH_STATUS.ALREADY_GENERATED
+            : att
+              ? BATCH_STATUS.READY
+              : BATCH_STATUS.NO_ATTENDANCE;
+
+        return {
+            compensation: comp._id,
+            employeeCode: employee?.employeeCode ?? null,
+            employeeName: employee
+                ? `${employee.lastName ?? ""}, ${employee.firstName ?? ""}`.trim()
+                : "—",
+            dailyRate: comp.dailyRate ?? 0,
+            attendanceDays: att?.days ?? 0,
+            attendanceHours: r2(att?.hours ?? 0),
+            status,
+        };
+    });
+
+    const counts = rows.reduce(
+        (acc, r) => ({ ...acc, [r.status]: (acc[r.status] ?? 0) + 1 }),
+        {},
+    );
+
+    res.status(StatusCodes.OK).json({
+        payrollFrom,
+        payrollTo,
+        // Loans come off the second cutoff only, so the screen can say whether
+        // this run will carry amortisation before anyone presses generate.
+        deductsLoans: isSecondCutoff(payrollFrom),
+        total: rows.length,
+        counts: {
+            ready: counts[BATCH_STATUS.READY] ?? 0,
+            noAttendance: counts[BATCH_STATUS.NO_ATTENDANCE] ?? 0,
+            alreadyGenerated: counts[BATCH_STATUS.ALREADY_GENERATED] ?? 0,
+        },
+        rows,
+    });
+};
+
+export const batchCreatePayrolls = async (req, res) => {
+    const { payrollFrom, payrollTo, payrollDate, compensations = [] } = req.body;
+    if (!payrollFrom || !payrollTo)
+        throw new BadRequestError("payrollFrom and payrollTo are required");
+    if (!Array.isArray(compensations) || compensations.length === 0)
+        throw new BadRequestError("select at least one employee to generate");
+
+    const from = utcDayStart(payrollFrom);
+
+    // Everything that already has a payroll for this period is skipped rather
+    // than failed, so re-running after adding staff mid-cutoff is safe and
+    // says plainly what it did and did not touch.
+    const existing = await Payroll.find({
+        compensation: { $in: compensations },
+        payrollFrom: from,
+    }).select("compensation");
+    const generated = new Set(existing.map((p) => String(p.compensation)));
+
+    const created = [];
+    const skipped = [];
+    const failed = [];
+
+    // Sequential on purpose. Each payroll is a good deal of work, and firing
+    // hundreds at once would starve every other request on a single-threaded
+    // server -- the batch finishing a little slower is the better trade.
+    for (const compensationId of compensations) {
+        if (generated.has(String(compensationId))) {
+            skipped.push({ compensation: compensationId, reason: "already generated" });
+            continue;
+        }
+        try {
+            const compensation = await existingCompensation(compensationId);
+            const payroll = await generatePayrollFor(compensation, {
+                payrollFrom,
+                payrollTo,
+                payrollFields: payrollDate ? { payrollDate } : {},
+            });
+            created.push(payroll._id);
+        } catch (error) {
+            // One bad compensation must not abandon the rest of the client.
+            failed.push({
+                compensation: compensationId,
+                reason: error?.message ?? "generation failed",
+            });
+        }
+    }
+
+    res.status(StatusCodes.CREATED).json({
+        msg: `${created.length} payroll(s) generated`,
+        created: created.length,
+        skipped,
+        failed,
+    });
 };
 
 export const updatePayroll = async (req, res) => {

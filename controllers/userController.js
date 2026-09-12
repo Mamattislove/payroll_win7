@@ -1,6 +1,6 @@
 import { StatusCodes } from "http-status-codes";
 import User from "../models/User.js";
-import { hashedPassword } from "../utils/passwordUtils.js";
+import { hashedPassword, comparePassword } from "../utils/passwordUtils.js";
 import { BadRequestError, NotFoundError } from "../errors/customErrors.js";
 import { USER_ROLES } from "../utils/constants.js";
 
@@ -82,6 +82,31 @@ export const updateUser = async (req, res) => {
 
     if (!user) throw new NotFoundError(`No user with id ${userId}`);
     res.status(StatusCodes.OK).json({ user });
+};
+
+/**
+ * Lets the signed-in user change their own password.
+ *
+ * Works on req.user.userId from the token rather than anything in the body, so
+ * there is no id to tamper with -- a user can only ever change their own.
+ */
+export const changeOwnPassword = async (req, res) => {
+    const user = await User.findById(req.user.userId);
+    if (!user) throw new NotFoundError("user not found");
+
+    const isValid = await comparePassword(
+        req.body.currentPassword,
+        user.password,
+    );
+    // Deliberately a 400 and not a 401: the app treats 401 as "your session
+    // ended" and bounces to the login page, so mistyping the current password
+    // would throw the user out mid-form instead of showing the error.
+    if (!isValid) throw new BadRequestError("current password is incorrect");
+
+    user.password = await hashedPassword(req.body.newPassword);
+    await user.save();
+
+    res.status(StatusCodes.OK).json({ msg: "password changed" });
 };
 
 export const resetUserPassword = async (req, res) => {

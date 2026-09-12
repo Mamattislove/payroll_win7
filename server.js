@@ -52,6 +52,7 @@ import employeeDesignationRouter from "./routers/employeeDesignationRouter.js";
 import payrollRouter from "./routers/payrollRouter.js";
 import auditLogRouter from "./routers/auditLogRouter.js";
 import Compensation from "./models/Compensation.js";
+import Payroll from "./models/Payroll.js";
 
 dotenv.config();
 const app = express();
@@ -127,6 +128,7 @@ const PORT = process.env.PORT || 5100;
 try {
     await mongoose.connect(process.env.MONGO_URL);
     await Compensation.syncIndexes();
+    await Payroll.syncIndexes();
     app.listen(PORT, () => {
         console.log(`Listening on PORT: ${PORT}`);
     });

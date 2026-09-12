@@ -94,6 +94,11 @@ const router = createBrowserRouter([
                 path: "payroll",
                 lazy: page(() => import("./pages/Payroll")),
             },
+            // Static segment, so the router ranks it above "payroll/:id".
+            {
+                path: "payroll/batch",
+                lazy: page(() => import("./pages/BatchPayroll")),
+            },
             {
                 path: "payroll/:id/edit",
                 lazy: page(() => import("./pages/EditPayroll")),
@@ -147,6 +152,12 @@ const router = createBrowserRouter([
             {
                 path: "settings",
                 lazy: page(() => import("./pages/Settings")),
+            },
+            // Every signed-in user can reach this one; it only ever acts on
+            // the account behind the current token.
+            {
+                path: "change-password",
+                lazy: page(() => import("./pages/ChangePassword")),
             },
             {
                 path: "earning-types",

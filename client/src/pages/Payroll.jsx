@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import {
+    Link,
     redirect,
     useLoaderData,
     useNavigate,
@@ -8,7 +9,7 @@ import {
     useRouteLoaderData,
 } from "react-router-dom";
 import { toast } from "react-toastify";
-import { FiEdit2, FiEye, FiPlus, FiTrash2, FiX } from "react-icons/fi";
+import { FiEdit2, FiEye, FiLayers, FiPlus, FiTrash2, FiX } from "react-icons/fi";
 import customFetch from "../../utils/customFetch";
 import {
     Overlay,
@@ -1495,100 +1496,6 @@ const PayrollDetailModal = ({
 
 // ─── process payroll modal ────────────────────────────────────────────────────
 
-const fmtAmount = (val) =>
-    `₱${Number(val).toLocaleString("en-PH", { minimumFractionDigits: 2 })}`;
-
-const DeductPreview = ({ records, loading, canShow }) => {
-    if (!canShow) return null;
-    if (loading)
-        return <p className="text-xs text-slate-400 mt-1.5 ml-7">Loading…</p>;
-    if (records.length === 0)
-        return (
-            <p className="text-xs text-slate-400 italic mt-1.5 ml-7">
-                No eligible records found.
-            </p>
-        );
-    return (
-        <ul className="mt-1.5 ml-7 space-y-1">
-            {records.map((r) => (
-                <li
-                    key={r._id}
-                    className="flex justify-between text-xs text-slate-600"
-                >
-                    <span>{r.name}</span>
-                    <span className="text-slate-500 font-medium">
-                        {fmtAmount(r.currentAmount)}
-                    </span>
-                </li>
-            ))}
-        </ul>
-    );
-};
-
-const LoanPreview = ({ records, loading, canShow }) => {
-    if (!canShow) return null;
-    if (loading)
-        return <p className="text-xs text-slate-400 mt-1.5 ml-7">Loading…</p>;
-    if (records.length === 0)
-        return (
-            <p className="text-xs text-slate-400 italic mt-1.5 ml-7">
-                No ongoing loans found.
-            </p>
-        );
-    return (
-        <ul className="mt-1.5 ml-7 space-y-1">
-            {records.map((r) => (
-                <li
-                    key={r._id}
-                    className="flex justify-between text-xs text-slate-600"
-                >
-                    <span>
-                        {r.loanName}
-                        {r.loanType?.loanTypeName
-                            ? ` (${r.loanType.loanTypeName})`
-                            : ""}
-                    </span>
-                    <span className="text-slate-500 font-medium">
-                        {fmtAmount(
-                            Math.min(
-                                r.monthlyAmortization || 0,
-                                r.loanPayable || 0,
-                            ),
-                        )}
-                    </span>
-                </li>
-            ))}
-        </ul>
-    );
-};
-
-const SavingsPreview = ({ records, loading, canShow }) => {
-    if (!canShow) return null;
-    if (loading)
-        return <p className="text-xs text-slate-400 mt-1.5 ml-7">Loading…</p>;
-    if (records.length === 0)
-        return (
-            <p className="text-xs text-slate-400 italic mt-1.5 ml-7">
-                No active savings plan found.
-            </p>
-        );
-    return (
-        <ul className="mt-1.5 ml-7 space-y-1">
-            {records.map((r) => (
-                <li
-                    key={r._id}
-                    className="flex justify-between text-xs text-slate-600"
-                >
-                    <span>Target: {fmtAmount(r.savingsTarget)}</span>
-                    <span className="text-slate-500 font-medium">
-                        {fmtAmount(r.cutoffDeductionAmount)}
-                    </span>
-                </li>
-            ))}
-        </ul>
-    );
-};
-
 const ProcessPayrollModal = ({ onClose, onDone }) => {
     const [saving, setSaving] = useState(false);
     const [selectedComp, setSelectedComp] = useState(null);
@@ -1596,175 +1503,11 @@ const ProcessPayrollModal = ({ onClose, onDone }) => {
         payrollFrom: "",
         payrollTo: "",
         payrollDate: "",
-        autoDeductDeductions: false,
-        autoDeductLoans: false,
-        autoDeductSavings: false,
-        autoDeductLoanApplications: false,
-    });
-    const [deductionPreview, setDeductionPreview] = useState([]);
-    const [loanPreview, setLoanPreview] = useState([]);
-    const [savingsPreview, setSavingsPreview] = useState([]);
-    const [loanAppPreview, setLoanAppPreview] = useState([]);
-    const [loadingPreview, setLoadingPreview] = useState({
-        deductions: false,
-        loans: false,
-        savings: false,
-        loanApplications: false,
     });
 
     const set = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
-    const toggle = (k) => () => setForm((p) => ({ ...p, [k]: !p[k] }));
 
     const selected = selectedComp;
-    const employeeId =
-        selected?.employeeDesignation?.employee?._id ??
-        selected?.employeeDesignation?.employee ??
-        null;
-    const canPreview = !!(employeeId && form.payrollTo);
-
-    useEffect(() => {
-        if (!form.autoDeductDeductions || !canPreview) {
-            setDeductionPreview([]);
-            return;
-        }
-        let cancelled = false;
-        setLoadingPreview((p) => ({ ...p, deductions: true }));
-        customFetch
-            .get(`/deduction-records?employee=${employeeId}&limit=500`)
-            .then(({ data }) => {
-                if (cancelled) return;
-                const to = new Date(form.payrollTo);
-                setDeductionPreview(
-                    (data.deductionRecords || []).filter((r) => {
-                        const flat =
-                            !r.monthlyDeduction ||
-                            Number(r.monthlyDeduction) === 0;
-                        const hasBalance = Number(r.currentAmount) > 0;
-                        const dateOk =
-                            !r.applicationDate ||
-                            new Date(r.applicationDate) <= to;
-                        return flat && hasBalance && dateOk;
-                    }),
-                );
-            })
-            .catch(() => {
-                if (!cancelled) setDeductionPreview([]);
-            })
-            .finally(() => {
-                if (!cancelled)
-                    setLoadingPreview((p) => ({ ...p, deductions: false }));
-            });
-        return () => {
-            cancelled = true;
-        };
-    }, [form.autoDeductDeductions, employeeId, form.payrollTo]);
-
-    useEffect(() => {
-        if (!form.autoDeductLoans || !canPreview) {
-            setLoanPreview([]);
-            return;
-        }
-        let cancelled = false;
-        setLoadingPreview((p) => ({ ...p, loans: true }));
-        customFetch
-            .get(`/deduction-records?employee=${employeeId}&limit=500`)
-            .then(({ data }) => {
-                if (cancelled) return;
-                const to = new Date(form.payrollTo);
-                setLoanPreview(
-                    +(data.deductionRecords || []).filter((r) => {
-                        const hasMonthly = Number(r.monthlyDeduction) > 0;
-                        const hasBalance = Number(r.currentAmount) > 0;
-                        const dateOk =
-                            !r.applicationDate ||
-                            new Date(r.applicationDate) <= to;
-                        return hasMonthly && hasBalance && dateOk;
-                    }),
-                );
-            })
-            .catch(() => {
-                if (!cancelled) setLoanPreview([]);
-            })
-            .finally(() => {
-                if (!cancelled)
-                    setLoadingPreview((p) => ({ ...p, loans: false }));
-            });
-        return () => {
-            cancelled = true;
-        };
-    }, [form.autoDeductLoans, employeeId, form.payrollTo]);
-
-    useEffect(() => {
-        if (!form.autoDeductSavings || !canPreview) {
-            setSavingsPreview([]);
-            return;
-        }
-        let cancelled = false;
-        setLoadingPreview((p) => ({ ...p, savings: true }));
-        customFetch
-            .get(`/savings?employee=${employeeId}&status=active&limit=100`)
-            .then(({ data }) => {
-                if (cancelled) return;
-                const to = new Date(form.payrollTo);
-                setSavingsPreview(
-                    (data.savings || []).filter((r) => {
-                        return (
-                            !r.effectiveDate || new Date(r.effectiveDate) <= to
-                        );
-                    }),
-                );
-            })
-            .catch(() => {
-                if (!cancelled) setSavingsPreview([]);
-            })
-            .finally(() => {
-                if (!cancelled)
-                    setLoadingPreview((p) => ({ ...p, savings: false }));
-            });
-        return () => {
-            cancelled = true;
-        };
-    }, [form.autoDeductSavings, employeeId, form.payrollTo]);
-
-    useEffect(() => {
-        if (!form.autoDeductLoanApplications || !canPreview) {
-            setLoanAppPreview([]);
-            return;
-        }
-        let cancelled = false;
-        setLoadingPreview((p) => ({ ...p, loanApplications: true }));
-        customFetch
-            .get(
-                `/loan-applications?employee=${employeeId}&loanStatus=on going&limit=100`,
-            )
-            .then(({ data }) => {
-                if (cancelled) return;
-                const to = new Date(form.payrollTo);
-                setLoanAppPreview(
-                    (data.loanApplications || []).filter((r) => {
-                        return (
-                            (r.loanPayable || 0) > 0 &&
-                            (!r.firstMonthAmortization ||
-                                new Date(r.firstMonthAmortization) <= to)
-                        );
-                    }),
-                );
-            })
-            .catch(() => {
-                if (!cancelled) setLoanAppPreview([]);
-            })
-            .finally(() => {
-                if (!cancelled)
-                    setLoadingPreview((p) => ({
-                        ...p,
-                        loanApplications: false,
-                    }));
-            });
-        return () => {
-            cancelled = true;
-        };
-    }, [form.autoDeductLoanApplications, employeeId, form.payrollTo]);
-
     const handleSubmit = async (e) => {
         e.preventDefault();
         setSaving(true);
@@ -1774,10 +1517,6 @@ const ProcessPayrollModal = ({ onClose, onDone }) => {
                 payrollFrom: form.payrollFrom,
                 payrollTo: form.payrollTo,
                 ...(form.payrollDate && { payrollDate: form.payrollDate }),
-                autoDeductDeductions: form.autoDeductDeductions,
-                autoDeductLoans: form.autoDeductLoans,
-                autoDeductSavings: form.autoDeductSavings,
-                autoDeductLoanApplications: form.autoDeductLoanApplications,
             });
             toast.success("Payroll processed");
             onDone();
@@ -1873,118 +1612,6 @@ const ProcessPayrollModal = ({ onClose, onDone }) => {
                             className={inputCls}
                         />
                     </Field>
-
-                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 flex flex-col gap-3">
-                        <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
-                            Auto Deduct
-                        </p>
-
-                        <div>
-                            <label className="flex items-center gap-3 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={form.autoDeductDeductions}
-                                    onChange={toggle("autoDeductDeductions")}
-                                    className="w-4 h-4 rounded border-slate-300 accent-slate-900"
-                                />
-                                <span className="text-sm text-slate-700">
-                                    Deductions{" "}
-                                    <span className="text-xs text-slate-400">
-                                        (flat / one-time)
-                                    </span>
-                                </span>
-                            </label>
-                            <DeductPreview
-                                records={deductionPreview}
-                                loading={loadingPreview.deductions}
-                                canShow={
-                                    form.autoDeductDeductions && canPreview
-                                }
-                            />
-                        </div>
-
-                        <div>
-                            <label className="flex items-center gap-3 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={form.autoDeductLoans}
-                                    onChange={toggle("autoDeductLoans")}
-                                    className="w-4 h-4 rounded border-slate-300 accent-slate-900"
-                                />
-                                <span className="text-sm text-slate-700">
-                                    Loans{" "}
-                                    <span className="text-xs text-slate-400">
-                                        (monthly installments)
-                                    </span>
-                                </span>
-                            </label>
-                            <DeductPreview
-                                records={loanPreview}
-                                loading={loadingPreview.loans}
-                                canShow={form.autoDeductLoans && canPreview}
-                            />
-                        </div>
-
-                        <div>
-                            <label className="flex items-center gap-3 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={form.autoDeductSavings}
-                                    onChange={toggle("autoDeductSavings")}
-                                    className="w-4 h-4 rounded border-slate-300 accent-slate-900"
-                                />
-                                <span className="text-sm text-slate-700">
-                                    Savings{" "}
-                                    <span className="text-xs text-slate-400">
-                                        (cutoff deduction)
-                                    </span>
-                                </span>
-                            </label>
-                            <SavingsPreview
-                                records={savingsPreview}
-                                loading={loadingPreview.savings}
-                                canShow={form.autoDeductSavings && canPreview}
-                            />
-                        </div>
-
-                        <div>
-                            <label className="flex items-center gap-3 cursor-pointer">
-                                <input
-                                    type="checkbox"
-                                    checked={form.autoDeductLoanApplications}
-                                    onChange={toggle(
-                                        "autoDeductLoanApplications",
-                                    )}
-                                    className="w-4 h-4 rounded border-slate-300 accent-slate-900"
-                                />
-                                <span className="text-sm text-slate-700">
-                                    Loan Applications{" "}
-                                    <span className="text-xs text-slate-400">
-                                        (amortization per loan)
-                                    </span>
-                                </span>
-                            </label>
-                            <LoanPreview
-                                records={loanAppPreview}
-                                loading={loadingPreview.loanApplications}
-                                canShow={
-                                    form.autoDeductLoanApplications &&
-                                    canPreview
-                                }
-                            />
-                        </div>
-
-                        {(form.autoDeductDeductions ||
-                            form.autoDeductLoans ||
-                            form.autoDeductSavings ||
-                            form.autoDeductLoanApplications) &&
-                            !canPreview && (
-                                <p className="text-xs text-slate-400 italic">
-                                    Select an employee and set the payroll end
-                                    date to preview eligible records.
-                                </p>
-                            )}
-                    </div>
 
                     <div className="flex gap-3 pt-2">
                         <button
@@ -2105,6 +1732,14 @@ const Payroll = () => {
                     </p>
                 </div>
                 {mayEdit && (
+                    <div className="flex items-center gap-2">
+                        <Link
+                            to="/dashboard/payroll/batch"
+                            className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
+                        >
+                            <FiLayers size={14} />
+                            Batch by Client
+                        </Link>
                     <button
                         onClick={() => setProcessOpen(true)}
                         className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-700 transition-colors"
@@ -2112,6 +1747,7 @@ const Payroll = () => {
                         <FiPlus size={14} />
                         Process Payroll
                     </button>
+                    </div>
                 )}
             </div>
 
