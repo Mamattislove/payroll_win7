@@ -727,8 +727,13 @@ const RowsEditor = ({ dateFrom, dateTo, compensation, dailyRate, presets, holida
                             {/* Day Type */}
                             <div className="mb-3">
                                 <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400 mb-1">Day Type</p>
-                                {holidayMap[row.attendanceDate] || leaveMap[row.attendanceDate] ? (
-                                    <div className="w-full border border-slate-200 rounded px-2 py-1.5 text-sm text-slate-400 bg-slate-50 cursor-not-allowed">
+                                {/* A holiday only pre-fills the day type now; it stays
+                                    editable so an employee who actually worked the
+                                    holiday differently can be corrected here. Leave
+                                    still comes from the approved application. */}
+                                {leaveMap[row.attendanceDate] ? (
+                                    <div className="w-full border border-slate-200 rounded px-2 py-1.5 text-sm text-slate-400 bg-slate-50 cursor-not-allowed"
+                                        title="Change day type on the Leave Applications page">
                                         {row.dayType}
                                     </div>
                                 ) : (
@@ -822,9 +827,9 @@ const RowsEditor = ({ dateFrom, dateTo, compensation, dailyRate, presets, holida
                                         </div>
                                     </td>
                                     <td className="px-3 py-2">
-                                        {holidayMap[row.attendanceDate] || leaveMap[row.attendanceDate] ? (
+                                        {leaveMap[row.attendanceDate] ? (
                                             <div className="w-full border border-slate-200 rounded px-2 py-1.5 text-sm text-slate-400 bg-slate-50 cursor-not-allowed"
-                                                title={holidayMap[row.attendanceDate] ? "Change day type on the Holidays page" : "Change day type on the Leave Applications page"}>
+                                                title="Change day type on the Leave Applications page">
                                                 {row.dayType}
                                             </div>
                                         ) : (

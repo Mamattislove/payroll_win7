@@ -9,7 +9,14 @@ import {
     useRouteLoaderData,
 } from "react-router-dom";
 import { toast } from "react-toastify";
-import { FiEdit2, FiEye, FiLayers, FiPlus, FiTrash2, FiX } from "react-icons/fi";
+import {
+    FiEdit2,
+    FiEye,
+    FiLayers,
+    FiPlus,
+    FiTrash2,
+    FiX,
+} from "react-icons/fi";
 import customFetch from "../../utils/customFetch";
 import {
     Overlay,
@@ -1740,13 +1747,13 @@ const Payroll = () => {
                             <FiLayers size={14} />
                             Batch by Client
                         </Link>
-                    <button
-                        onClick={() => setProcessOpen(true)}
-                        className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-700 transition-colors"
-                    >
-                        <FiPlus size={14} />
-                        Process Payroll
-                    </button>
+                        <button
+                            onClick={() => setProcessOpen(true)}
+                            className="flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg bg-slate-900 text-white hover:bg-slate-700 transition-colors"
+                        >
+                            <FiPlus size={14} />
+                            Process Payroll
+                        </button>
                     </div>
                 )}
             </div>
