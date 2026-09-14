@@ -7,6 +7,7 @@ import {
     WHERE_DID_YOU_HEAR_ABOUT_US,
 } from "../../utils/constants.js";
 import { existingDepartment, existingEmployee } from "../existingMiddleware.js";
+import Employee from "../../models/Employee.js";
 
 // Shared optional fields used by both create and update validators
 const sharedOptionalFields = [
@@ -185,11 +186,62 @@ const sharedOptionalFields = [
         .withMessage("invalid whereDidYouHearAboutUs value"),
 ];
 
+/**
+ * Refuses a second employee with the same name as one already on file.
+ *
+ * The roster already carries 81 groups of employees sharing a first, middle
+ * and last name, 19 of them with two or more still active, and their employee
+ * codes give the game away -- F-5241 beside F--5241, T-4152 beside T-04152.
+ * Those are the same person keyed twice, and every one of them is a payroll
+ * that can be generated twice.
+ *
+ * Real namesakes do exist, so this is a stop rather than a wall: send
+ * `allowDuplicateName: true` to record one deliberately. The message names the
+ * existing employee's code so the difference can be checked first.
+ */
+const rejectDuplicateName = body("lastName").custom(async (lastName, { req }) => {
+    if (req.body.allowDuplicateName === true) return true;
+
+    // Case- and whitespace-insensitive: "dela cruz" and "DELA CRUZ " are the
+    // same person, and anchored so it matches the whole name, not part of it.
+    const exact = (value) => {
+        const trimmed = String(value ?? "").trim();
+        if (!trimmed) return null;
+        const escaped = trimmed.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        return { $regex: `^\\s*${escaped}\\s*$`, $options: "i" };
+    };
+
+    const filter = {
+        firstName: exact(req.body.firstName),
+        lastName: exact(lastName),
+    };
+    if (!filter.firstName || !filter.lastName) return true;
+
+    // A blank middle name has to match blank, missing, or whitespace, or a
+    // record saved without one would never be recognised as the same person.
+    const middle = exact(req.body.middleName);
+    filter.middleName = middle ?? { $in: [null, ""] };
+
+    const existing = await Employee.findOne(filter).select(
+        "employeeCode employmentStatus",
+    );
+    if (!existing) return true;
+
+    const code = existing.employeeCode
+        ? ` (employee code ${existing.employeeCode})`
+        : "";
+    throw new Error(
+        `an employee named ${req.body.firstName} ${req.body.lastName} already exists${code}. ` +
+            "Check that this is not the same person; to record a different person with the same name, confirm the duplicate.",
+    );
+});
+
 export const validateEmployeeInput = withValidationErrors([
     body("firstName").notEmpty().withMessage("first name is required"),
     body("lastName").notEmpty().withMessage("last name is required"),
     body("gender").isIn(Object.values(GENDER)).withMessage("invalid gender"),
     body("birthDate").isDate().withMessage("birth date is invalid"),
+    rejectDuplicateName,
     ...sharedOptionalFields,
 ]);
 

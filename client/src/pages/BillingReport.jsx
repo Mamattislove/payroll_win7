@@ -3,7 +3,7 @@ import { redirect, useLoaderData } from "react-router-dom";
 import { FiDownload } from "react-icons/fi";
 import { Document, Page, View, Text, Image, StyleSheet, pdf } from "@react-pdf/renderer";
 import customFetch from "../../utils/customFetch";
-import { DAY_TYPES } from "../../../utils/constants";
+import { DAY_TYPES, EMPLOYMENT_STATUS } from "../../../utils/constants";
 import { ClientCombobox } from "../components";
 import logo from "../assets/ynl.png";
 
@@ -392,6 +392,7 @@ const BillingReport = () => {
                 dateFrom: filter.dateFrom,
                 dateTo: filter.dateTo,
                 limit: 10000,
+                employeeStatus: EMPLOYMENT_STATUS.ACTIVE,
             });
             // The bill is built from attendance, so an employee with no
             // timekeeping simply does not appear on it. Pull the payrolls for
@@ -403,6 +404,7 @@ const BillingReport = () => {
                 from: filter.dateFrom,
                 to: filter.dateTo,
                 limit: 10000,
+                employeeStatus: EMPLOYMENT_STATUS.ACTIVE,
             });
             const [{ data }, { data: payrollData }] = await Promise.all([
                 customFetch.get(`/attendances?${params}`),

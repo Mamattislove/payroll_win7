@@ -17,6 +17,33 @@ import {
     WHERE_DID_YOU_HEAR_ABOUT_US,
 } from "../../../utils/constants";
 
+/**
+ * A column header that sorts the table.
+ *
+ * Declared at module scope on purpose: a component created inside another
+ * component is a brand new type on every render, so React unmounts the old
+ * header and mounts a fresh one each pass instead of updating it.
+ */
+const SortableTh = ({ column, sort, onToggle, children }) => {
+    const active = sort === column || sort === `-${column}`;
+    const descending = sort === `-${column}`;
+    return (
+        <th className="px-4 py-3 text-left">
+            <button
+                type="button"
+                onClick={() => onToggle(column)}
+                className="flex items-center gap-1 uppercase tracking-wider hover:text-slate-300 transition-colors"
+                title={`Sort by ${column}`}
+            >
+                {children}
+                <span className={active ? "text-white" : "text-slate-500"}>
+                    {active ? (descending ? "\u25bc" : "\u25b2") : "\u25b5"}
+                </span>
+            </button>
+        </th>
+    );
+};
+
 export const loader = async ({ request }) => {
     try {
         const url = new URL(request.url);
@@ -24,7 +51,8 @@ export const loader = async ({ request }) => {
         const search = url.searchParams.get("search") || "";
         const status = url.searchParams.get("status") || "";
         const gender = url.searchParams.get("gender") || "";
-        const params = new URLSearchParams({ page, search, status, gender, limit: 20 });
+        const sort = url.searchParams.get("sort") || "";
+        const params = new URLSearchParams({ page, search, status, gender, sort, limit: 20 });
         const { data } = await customFetch.get(`/employees?${params}`);
         return data;
     } catch (error) {
@@ -335,6 +363,21 @@ const Employees = () => {
         setSearchParams({ page: "1" });
     };
 
+    // Sorting lives in the URL like the filters, so a sorted list survives a
+    // refresh and the back button, and can be shared as a link.
+    const sort = searchParams.get("sort") || "name";
+
+    const toggleSort = (key) => {
+        setSearchParams((prev) => {
+            const params = new URLSearchParams(prev);
+            // Same column again flips the direction; a new column starts ascending.
+            params.set("sort", sort === key ? `-${key}` : key);
+            // Row order changed, so page 2 of the old order is meaningless.
+            params.set("page", "1");
+            return params;
+        });
+    };
+
     const setPage = (page) => {
         setSearchParams((prev) => {
             const params = new URLSearchParams(prev);
@@ -448,14 +491,14 @@ const Employees = () => {
                     <thead>
                         <tr className="bg-slate-900 text-white text-xs uppercase tracking-wider">
                             <th className="px-4 py-3 text-left">#</th>
-                            <th className="px-4 py-3 text-left">
+                            <SortableTh column="code" sort={sort} onToggle={toggleSort}>
                                 Employee Code
-                            </th>
-                            <th className="px-4 py-3 text-left">Full Name</th>
-                            <th className="px-4 py-3 text-left">Gender</th>
-                            <th className="px-4 py-3 text-left">
+                            </SortableTh>
+                            <SortableTh column="name" sort={sort} onToggle={toggleSort}>Full Name</SortableTh>
+                            <SortableTh column="gender" sort={sort} onToggle={toggleSort}>Gender</SortableTh>
+                            <SortableTh column="status" sort={sort} onToggle={toggleSort}>
                                 Employment Status
-                            </th>
+                            </SortableTh>
                             <th className="px-4 py-3 text-left">Actions</th>
                         </tr>
                     </thead>

@@ -2,6 +2,7 @@ import { StatusCodes } from "http-status-codes";
 import Payroll from "../models/Payroll.js";
 import Attendance from "../models/Attendance.js";
 import EmployeeDesignation from "../models/EmployeeDesignation.js";
+import Employee from "../models/Employee.js";
 import Compensation from "../models/Compensation.js";
 import EarningRecord from "../models/EarningRecord.js";
 import AllowanceRecord from "../models/AllowanceRecord.js";
@@ -54,7 +55,12 @@ async function linkRecords(payrollId, { earnings = [], allowances = [], deductio
     await Promise.all(
         Object.entries(RECORD_MODELS).map(([key, Model]) =>
             ids[key].length
-                ? Model.updateMany({ _id: { $in: ids[key] } }, { payroll: payrollId })
+                ? Model.updateMany(
+                      { _id: { $in: ids[key] } },
+                      // Attaching on purpose undoes an earlier removal, so the
+                      // record behaves normally again from here on.
+                      { payroll: payrollId, excludedFromPayroll: false },
+                  )
                 : null,
         ),
     );
@@ -77,7 +83,13 @@ async function unlinkDeductions(paymentDocs) {
 
 // Unlinks earning/allowance/charge records from a payroll (no balance to restore).
 async function unlinkSimpleRecords(Model, payrollId) {
-    await Model.updateMany({ payroll: payrollId }, { payroll: null });
+    // Flagged as well as unlinked. Clearing the payroll alone leaves the
+    // record looking like one that was never attached, and the auto-attach
+    // below would hand it straight to the next payroll for this employee.
+    await Model.updateMany(
+        { payroll: payrollId },
+        { payroll: null, excludedFromPayroll: true },
+    );
 }
 
 async function replaceSavingsPayments(payrollId, savingsIds) {
@@ -270,8 +282,25 @@ async function generateLoanInstances(payrollId, employeeId, payrollTo) {
 // Payroll carries no direct client reference — it hangs off
 // compensation -> employeeDesignation -> client. Resolve a client down to the
 // compensation ids sitting underneath it.
-async function compensationIdsForClient(client) {
-    const designations = await EmployeeDesignation.find({ client }).select("_id");
+/**
+ * Compensation ids for a client, optionally narrowed to employees with a
+ * given employment status.
+ *
+ * The status is the employee's status *now*, not as at the pay period, so a
+ * report filtered this way changes as people leave. That is the caller's
+ * choice to make -- see the reports, which ask for active only.
+ */
+async function compensationIdsForClient(client, employeeStatus) {
+    const designationFilter = {};
+    if (client) designationFilter.client = client;
+    if (employeeStatus) {
+        const employees = await Employee.find({
+            employmentStatus: employeeStatus,
+        }).select("_id");
+        designationFilter.employee = { $in: employees.map((e) => e._id) };
+    }
+    const designations =
+        await EmployeeDesignation.find(designationFilter).select("_id");
     const compensations = await Compensation.find({
         employeeDesignation: { $in: designations.map((d) => d._id) },
     }).select("_id");
@@ -325,15 +354,27 @@ const withEmptyRecordArrays = (payroll) => {
 };
 
 export const getAllPayrolls = async (req, res) => {
-    const { page = 1, limit = 10, compensation, from, to, payrollFrom, payrollTo, client } = req.query;
+    const {
+        page = 1,
+        limit = 10,
+        compensation,
+        from,
+        to,
+        payrollFrom,
+        payrollTo,
+        client,
+        employeeStatus,
+    } = req.query;
 
     const pageNum = Math.max(1, Number(page));
     const limitNum = Math.max(1, Number(limit));
     const skip = (pageNum - 1) * limitNum;
 
     const query = {};
-    if (client && !compensation) {
-        query.compensation = { $in: await compensationIdsForClient(client) };
+    if ((client || employeeStatus) && !compensation) {
+        query.compensation = {
+            $in: await compensationIdsForClient(client, employeeStatus),
+        };
     }
     if (compensation) query.compensation = compensation;
     // Matches whole pay periods that fall inside the range, so a range that
@@ -513,7 +554,13 @@ async function generatePayrollFor(
         compensationDoc.employeeDesignation?.employee?._id ??
         compensationDoc.employeeDesignation?.employee;
 
-    const unlinked = { payroll: null, employee: employeeId };
+    // Standing records for this employee that have never been attached to a
+    // payroll. One deliberately taken off an earlier payroll is left alone.
+    const unlinked = {
+        payroll: null,
+        employee: employeeId,
+        excludedFromPayroll: { $ne: true },
+    };
 
     // Auto-attach all unlinked standing records for this employee
     await Promise.all([

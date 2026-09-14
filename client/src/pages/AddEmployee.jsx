@@ -1,5 +1,11 @@
 import { useState } from "react";
-import { useNavigate, useNavigation, Form, redirect } from "react-router-dom";
+import {
+    useActionData,
+    useNavigate,
+    useNavigation,
+    Form,
+    redirect,
+} from "react-router-dom";
 import { toast } from "react-toastify";
 import customFetch from "../../utils/customFetch";
 import {
@@ -87,15 +93,22 @@ export const action = async ({ request }) => {
         }
         console.log(data);
 
+        data.allowDuplicateName = flat.allowDuplicateName === "true";
+
         await customFetch.post("/employees", data);
         toast.success("Employee added successfully");
         return redirect("/dashboard/employees");
     } catch (error) {
-        toast.error(
+        const msg =
             error?.response?.data?.msg ||
-                error?.response?.data?.message ||
-                error.message,
-        );
+            error?.response?.data?.message ||
+            error.message;
+        const text = Array.isArray(msg) ? msg.join(" ") : String(msg ?? "");
+        toast.error(text);
+        // Hand the name clash back to the page so it can offer the
+        // override, rather than leaving a dead end behind a toast.
+        if (/already exists/i.test(text))
+            return { duplicateName: true, message: text };
         return null;
     }
 };
@@ -160,6 +173,7 @@ const emptyReference = () => ({
 // ─── component ────────────────────────────────────────────────────────────────
 
 const AddEmployee = () => {
+    const actionData = useActionData();
     const navigate = useNavigate();
     const navigation = useNavigation();
     const submitting = navigation.state === "submitting";
@@ -1220,6 +1234,26 @@ const AddEmployee = () => {
                 />
 
                 {/* Submit bar */}
+                {actionData?.duplicateName && (
+                    <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
+                        <p className="text-sm text-amber-800">
+                            <span className="font-semibold">
+                                That name is already on file.
+                            </span>{" "}
+                            {actionData.message}
+                        </p>
+                        <label className="mt-2 flex items-center gap-2 text-sm text-amber-900">
+                            <input
+                                type="checkbox"
+                                name="allowDuplicateName"
+                                value="true"
+                                className="w-4 h-4 rounded border-amber-300 accent-amber-600"
+                            />
+                            This is a different person with the same name — save
+                            anyway
+                        </label>
+                    </div>
+                )}
                 <div className="mt-6 flex flex-col sm:flex-row justify-end gap-3">
                     <button
                         type="button"

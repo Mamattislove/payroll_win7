@@ -25,6 +25,7 @@ export const getAllAttendances = async (req, res) => {
         dateFrom,
         dateTo,
         zeroHours,
+        employeeStatus,
         sort = "desc",
     } = req.query;
 
@@ -55,6 +56,21 @@ export const getAllAttendances = async (req, res) => {
     }
     if (client) {
         const designations = await EmployeeDesignation.find({ client }).select("_id");
+        const compIds = await Compensation.find({
+            employeeDesignation: { $in: designations.map((d) => d._id) },
+        }).select("_id");
+        compensationIdSets.push(compIds.map((c) => String(c._id)));
+    }
+    // Same narrowing as the payroll list: the reports ask for active
+    // employees only. This is the employee's status now, not as at the
+    // period, so a past report shrinks as people leave.
+    if (employeeStatus) {
+        const employees = await Employee.find({
+            employmentStatus: employeeStatus,
+        }).select("_id");
+        const designations = await EmployeeDesignation.find({
+            employee: { $in: employees.map((e) => e._id) },
+        }).select("_id");
         const compIds = await Compensation.find({
             employeeDesignation: { $in: designations.map((d) => d._id) },
         }).select("_id");

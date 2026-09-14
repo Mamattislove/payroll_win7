@@ -5,6 +5,32 @@ import { NotFoundError } from "../errors/customErrors.js";
 import { EMPLOYMENT_STATUS } from "../utils/constants.js";
 import { employeeNameSearchOr } from "../utils/searchHelpers.js";
 
+/*
+ * Sortable columns, and what each one actually orders by.
+ *
+ * A whitelist rather than passing req.query straight to .sort(): the value
+ * reaches MongoDB, so an arbitrary field would let a caller order by anything
+ * in the document, and an object-shaped one could alter the query.
+ *
+ * The list is paginated, so this has to happen in the database -- sorting the
+ * twenty rows already on screen would only shuffle the current page.
+ */
+const EMPLOYEE_SORTS = {
+    // Two keys, because employees share surnames and an unstable tiebreak
+    // makes rows jump between pages as you flip through them.
+    name: { lastName: 1, firstName: 1 },
+    "-name": { lastName: -1, firstName: -1 },
+    code: { employeeCode: 1 },
+    "-code": { employeeCode: -1 },
+    gender: { gender: 1, lastName: 1 },
+    "-gender": { gender: -1, lastName: 1 },
+    status: { employmentStatus: 1, lastName: 1 },
+    "-status": { employmentStatus: -1, lastName: 1 },
+};
+
+// Insertion order is meaningless to a reader; surname is what people scan for.
+const DEFAULT_EMPLOYEE_SORT = EMPLOYEE_SORTS.name;
+
 export const getAllEmployees = async (req, res) => {
     const {
         page = 1,
@@ -12,6 +38,7 @@ export const getAllEmployees = async (req, res) => {
         search = "",
         status = "",
         gender = "",
+        sort = "",
     } = req.query;
 
     const pageNum = Math.max(1, Number(page));
@@ -31,7 +58,15 @@ export const getAllEmployees = async (req, res) => {
     const totalEmployees = await Employee.countDocuments(query);
     const totalPages = Math.ceil(totalEmployees / limitNum);
 
-    const employees = await Employee.find(query).skip(skip).limit(limitNum);
+    const employees = await Employee.find(query)
+        .sort(EMPLOYEE_SORTS[sort] ?? DEFAULT_EMPLOYEE_SORT)
+        // Without a collation MongoDB sorts by byte value, so a lowercase name
+        // lands after every uppercase one -- "halum" sorted past Z, showing up
+        // last ascending and first descending. strength 2 ignores case (and
+        // still distinguishes accents), which is what a reader expects.
+        .collation({ locale: "en", strength: 2 })
+        .skip(skip)
+        .limit(limitNum);
 
     res.status(StatusCodes.OK).json({
         totalEmployees,

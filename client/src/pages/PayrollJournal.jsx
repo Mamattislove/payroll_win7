@@ -11,6 +11,7 @@ import {
     pdf,
 } from "@react-pdf/renderer";
 import customFetch from "../../utils/customFetch";
+import { EMPLOYMENT_STATUS } from "../../../utils/constants";
 import { ClientCombobox } from "../components";
 import logo from "../assets/ynl.png";
 
@@ -607,6 +608,7 @@ const PayrollJournal = () => {
                 from: filter.dateFrom,
                 to: filter.dateTo,
                 limit: 10000,
+                employeeStatus: EMPLOYMENT_STATUS.ACTIVE,
             });
             const { data } = await customFetch.get(`/payrolls?${params}`);
             const rows = buildRows(data.payrolls || []);
