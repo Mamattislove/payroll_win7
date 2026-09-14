@@ -85,13 +85,31 @@ const blankRow = (date, holidayMap = {}, leaveMap = {}) => {
         overtimeHours: "",
         nightPremiumHours: "",
         overtimeNightPremiumHours: "",
-        lateHr: "",
-        undertimeHr: "",
+        lateMin: "",
+        undertimeMin: "",
         remarks,
     };
 };
 
 const numberOrUndefined = (val) => (val === "" || val === null || val === undefined ? undefined : Number(val));
+
+// Late and undertime are stored as HOURS, because pay is computed per hour
+// (lateHr * perHour in computeAttendance). A timesheet reports them in
+// minutes, so the grid takes minutes and converts at the two API
+// boundaries -- typing 30 must never reach the server as 30 hours.
+const MINUTES_PER_HOUR = 60;
+
+const minutesToHours = (minutes) => {
+    const n = numberOrUndefined(minutes);
+    return n === undefined ? undefined : n / MINUTES_PER_HOUR;
+};
+
+// Rounded, because minutes are the unit a clerk works in: 0.0833 hours is
+// 5 minutes, and showing 5.0 is what they expect to see and re-enter.
+const hoursToMinutes = (hours) =>
+    hours === null || hours === undefined || hours === ""
+        ? ""
+        : Math.round(Number(hours) * MINUTES_PER_HOUR);
 
 // Quick-fill presets for common shift patterns — values are configurable
 // from the top of the page and applied per-row via the Shortcut buttons.
@@ -136,8 +154,8 @@ const rowTotalPay = (row, dailyRate) => {
         overtimeHours: Number(row.overtimeHours) || 0,
         nightPremiumHours: Number(row.nightPremiumHours) || 0,
         overtimeNightPremiumHours: Number(row.overtimeNightPremiumHours) || 0,
-        lateHr: Number(row.lateHr) || 0,
-        undertimeHr: Number(row.undertimeHr) || 0,
+        lateHr: (Number(row.lateMin) || 0) / MINUTES_PER_HOUR,
+        undertimeHr: (Number(row.undertimeMin) || 0) / MINUTES_PER_HOUR,
     });
     return (
         computed.regularHoursPay +
@@ -395,8 +413,8 @@ const SummaryModal = ({ rows, dailyRate, dateFrom, dateTo, onCancel, onConfirm, 
         overtimeHours: sum("overtimeHours"),
         nightPremiumHours: sum("nightPremiumHours"),
         overtimeNightPremiumHours: sum("overtimeNightPremiumHours"),
-        lateHr: sum("lateHr"),
-        undertimeHr: sum("undertimeHr"),
+        lateMin: sum("lateMin"),
+        undertimeMin: sum("undertimeMin"),
     };
     const totalHours =
         totals.regularHours + totals.overtimeHours + totals.nightPremiumHours + totals.overtimeNightPremiumHours;
@@ -445,12 +463,12 @@ const SummaryModal = ({ rows, dailyRate, dateFrom, dateTo, onCancel, onConfirm, 
                                     <tr className="bg-slate-900 text-white uppercase tracking-wider sticky top-0">
                                         <th className="px-3 py-2 text-left">Date</th>
                                         <th className="px-3 py-2 text-left">Day Type</th>
-                                        <th className="px-3 py-2 text-right">Reg</th>
-                                        <th className="px-3 py-2 text-right">OT</th>
-                                        <th className="px-3 py-2 text-right">ND</th>
-                                        <th className="px-3 py-2 text-right">OT-ND</th>
-                                        <th className="px-3 py-2 text-right">Late</th>
-                                        <th className="px-3 py-2 text-right">UT</th>
+                                        <th className="px-3 py-2 text-right">Reg (hrs)</th>
+                                        <th className="px-3 py-2 text-right">OT (hrs)</th>
+                                        <th className="px-3 py-2 text-right">ND (hrs)</th>
+                                        <th className="px-3 py-2 text-right">OT-ND (hrs)</th>
+                                        <th className="px-3 py-2 text-right">Late (mins)</th>
+                                        <th className="px-3 py-2 text-right">UT (mins)</th>
                                         <th className="px-3 py-2 text-right">Pay</th>
                                     </tr>
                                 </thead>
@@ -472,8 +490,8 @@ const SummaryModal = ({ rows, dailyRate, dateFrom, dateTo, onCancel, onConfirm, 
                                             <td className="px-3 py-1.5 text-right text-slate-600">{(Number(row.overtimeHours) || 0).toFixed(2)}</td>
                                             <td className="px-3 py-1.5 text-right text-slate-600">{(Number(row.nightPremiumHours) || 0).toFixed(2)}</td>
                                             <td className="px-3 py-1.5 text-right text-slate-600">{(Number(row.overtimeNightPremiumHours) || 0).toFixed(2)}</td>
-                                            <td className="px-3 py-1.5 text-right text-slate-600">{(Number(row.lateHr) || 0).toFixed(2)}</td>
-                                            <td className="px-3 py-1.5 text-right text-slate-600">{(Number(row.undertimeHr) || 0).toFixed(2)}</td>
+                                            <td className="px-3 py-1.5 text-right text-slate-600">{(Number(row.lateMin) || 0).toFixed(0)}</td>
+                                            <td className="px-3 py-1.5 text-right text-slate-600">{(Number(row.undertimeMin) || 0).toFixed(0)}</td>
                                             <td className="px-3 py-1.5 text-right font-medium text-slate-800">
                                                 ₱{rowTotalPay(row, dailyRate).toLocaleString("en-PH", { minimumFractionDigits: 2 })}
                                             </td>
@@ -485,12 +503,12 @@ const SummaryModal = ({ rows, dailyRate, dateFrom, dateTo, onCancel, onConfirm, 
                     </div>
 
                     <div className="grid grid-cols-4 gap-2">
-                        <StatTile label="Reg Hrs" value={totals.regularHours.toFixed(2)} />
-                        <StatTile label="OT Hrs" value={totals.overtimeHours.toFixed(2)} />
-                        <StatTile label="Night Prem" value={totals.nightPremiumHours.toFixed(2)} />
-                        <StatTile label="OT Night" value={totals.overtimeNightPremiumHours.toFixed(2)} />
-                        <StatTile label="Late" value={totals.lateHr.toFixed(2)} />
-                        <StatTile label="Undertime" value={totals.undertimeHr.toFixed(2)} />
+                        <StatTile label="Reg (hrs)" value={totals.regularHours.toFixed(2)} />
+                        <StatTile label="OT (hrs)" value={totals.overtimeHours.toFixed(2)} />
+                        <StatTile label="Night Prem (hrs)" value={totals.nightPremiumHours.toFixed(2)} />
+                        <StatTile label="OT Night (hrs)" value={totals.overtimeNightPremiumHours.toFixed(2)} />
+                        <StatTile label="Late (mins)" value={totals.lateMin.toFixed(0)} />
+                        <StatTile label="Undertime (mins)" value={totals.undertimeMin.toFixed(0)} />
                         <StatTile label="Work Hours" value={(totals.regularHours / 8).toFixed(2)} />
                     </div>
 
@@ -539,8 +557,8 @@ const toRecord = (r) => ({
     overtimeHours: numberOrUndefined(r.overtimeHours),
     nightPremiumHours: numberOrUndefined(r.nightPremiumHours),
     overtimeNightPremiumHours: numberOrUndefined(r.overtimeNightPremiumHours),
-    lateHr: numberOrUndefined(r.lateHr),
-    undertimeHr: numberOrUndefined(r.undertimeHr),
+    lateHr: minutesToHours(r.lateMin),
+    undertimeHr: minutesToHours(r.undertimeMin),
     remarks: r.remarks || undefined,
 });
 
@@ -574,8 +592,8 @@ const RowsEditor = ({ dateFrom, dateTo, compensation, dailyRate, presets, holida
                             overtimeHours: existing.overtimeHours ?? "",
                             nightPremiumHours: existing.nightPremiumHours ?? "",
                             overtimeNightPremiumHours: existing.overtimeNightPremiumHours ?? "",
-                            lateHr: existing.lateHr ?? "",
-                            undertimeHr: existing.undertimeHr ?? "",
+                            lateMin: hoursToMinutes(existing.lateHr),
+                            undertimeMin: hoursToMinutes(existing.undertimeHr),
                             remarks: existing.remarks || row.remarks,
                         };
                     }),
@@ -663,12 +681,12 @@ const RowsEditor = ({ dateFrom, dateTo, compensation, dailyRate, presets, holida
     }
 
     const hourFields = [
-        { field: "regularHours", label: "Reg Hrs" },
-        { field: "overtimeHours", label: "OT Reg" },
-        { field: "nightPremiumHours", label: "Night Prem" },
-        { field: "overtimeNightPremiumHours", label: "OT Night" },
-        { field: "lateHr", label: "Late" },
-        { field: "undertimeHr", label: "Undertime" },
+        { field: "regularHours", label: "Reg (hrs)" },
+        { field: "overtimeHours", label: "OT Reg (hrs)" },
+        { field: "nightPremiumHours", label: "Night Prem (hrs)" },
+        { field: "overtimeNightPremiumHours", label: "OT Night (hrs)" },
+        { field: "lateMin", label: "Late (mins)" },
+        { field: "undertimeMin", label: "Undertime (mins)" },
     ];
 
     return (
@@ -774,12 +792,12 @@ const RowsEditor = ({ dateFrom, dateTo, compensation, dailyRate, presets, holida
                                 <th className="px-3 py-3 text-left">Date</th>
                                 <th className="px-3 py-3 text-left min-w-32">Shortcut</th>
                                 <th className="px-3 py-3 text-left min-w-45">Day Type</th>
-                                <th className="px-3 py-3 text-right min-w-22.5">Reg Hrs</th>
-                                <th className="px-3 py-3 text-right min-w-22.5">OT Reg</th>
-                                <th className="px-3 py-3 text-right min-w-22.5">Night Prem</th>
-                                <th className="px-3 py-3 text-right min-w-22.5">OT Night Prem</th>
-                                <th className="px-3 py-3 text-right min-w-20">Late</th>
-                                <th className="px-3 py-3 text-right min-w-20">Undertime</th>
+                                <th className="px-3 py-3 text-right min-w-22.5">Reg (hrs)</th>
+                                <th className="px-3 py-3 text-right min-w-22.5">OT Reg (hrs)</th>
+                                <th className="px-3 py-3 text-right min-w-22.5">Night Prem (hrs)</th>
+                                <th className="px-3 py-3 text-right min-w-22.5">OT Night (hrs)</th>
+                                <th className="px-3 py-3 text-right min-w-20">Late (mins)</th>
+                                <th className="px-3 py-3 text-right min-w-20">Undertime (mins)</th>
                                 <th className="px-3 py-3 text-right min-w-22.5">Total Pay</th>
                                 <th className="px-3 py-3"></th>
                             </tr>
@@ -859,13 +877,13 @@ const RowsEditor = ({ dateFrom, dateTo, compensation, dailyRate, presets, holida
                                             className={`${cellInputCls} text-right`} />
                                     </td>
                                     <td className="px-3 py-2">
-                                        <input type="number" min={0} step="any" value={row.lateHr}
-                                            onChange={(e) => updateRow(idx, "lateHr", e.target.value)}
+                                        <input type="number" min={0} step="1" value={row.lateMin}
+                                            onChange={(e) => updateRow(idx, "lateMin", e.target.value)}
                                             className={`${cellInputCls} text-right`} />
                                     </td>
                                     <td className="px-3 py-2">
-                                        <input type="number" min={0} step="any" value={row.undertimeHr}
-                                            onChange={(e) => updateRow(idx, "undertimeHr", e.target.value)}
+                                        <input type="number" min={0} step="1" value={row.undertimeMin}
+                                            onChange={(e) => updateRow(idx, "undertimeMin", e.target.value)}
                                             className={`${cellInputCls} text-right`} />
                                     </td>
                                     <td className="px-3 py-2 text-right font-medium text-slate-700">
