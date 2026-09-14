@@ -4,7 +4,7 @@ import { toast } from "react-toastify";
 import { FiEdit2, FiEye, FiPlus, FiTrash2, FiX } from "react-icons/fi";
 import customFetch from "../../utils/customFetch";
 import { useConfirm, Pagination } from "../components";
-import { SAVINS_STATUS } from "../../../utils/constants";
+import { SAVINS_STATUS, EMPLOYMENT_STATUS } from "../../../utils/constants";
 
 export const loader = async ({ request }) => {
     try {
@@ -77,7 +77,14 @@ const EmployeeCombobox = ({ value, onChange }) => {
         const timer = setTimeout(async () => {
             try {
                 const { data } = await customFetch.get("/employees", {
-                    params: { search: query, limit: 20 },
+                    // Inactive employees are kept for their history but
+                    // should not be offered here: nearly half the roster
+                    // has left, and they bury the current staff.
+                    params: {
+                        search: query,
+                        limit: 20,
+                        status: EMPLOYMENT_STATUS.ACTIVE,
+                    },
                 });
                 if (!cancelled) setResults(data.employees || []);
             } finally {

@@ -14,7 +14,11 @@ import LoanApplication from "../models/LoanApplication.js";
 import LoanPayment from "../models/LoanPayment.js";
 import ChargeRecord from "../models/ChargeRecord.js";
 import { NotFoundError, BadRequestError } from "../errors/customErrors.js";
-import { LOAN_STATUS, COMPENSATION_STATUS } from "../utils/constants.js";
+import {
+    LOAN_STATUS,
+    COMPENSATION_STATUS,
+    EMPLOYMENT_STATUS,
+} from "../utils/constants.js";
 import { existingCompensation } from "../middlewares/existingMiddleware.js";
 import { computePayroll } from "../utils/computePayroll.js";
 import { recomputePayrollTotals } from "../utils/recomputePayroll.js";
@@ -653,7 +657,18 @@ const BATCH_STATUS = {
 
 /** Active compensations for a client, with the employee populated for display. */
 async function clientCompensations(client) {
-    const designations = await EmployeeDesignation.find({ client }).select("_id");
+    // Both statuses have to hold: an active compensation says there is a rate
+    // to pay against, an active employee says there is someone to pay. Today
+    // every active compensation belongs to an active employee, so this changes
+    // nothing -- it is here so a compensation left active after someone leaves
+    // cannot quietly put an ex-employee into a batch of 200.
+    const activeEmployees = await Employee.find({
+        employmentStatus: EMPLOYMENT_STATUS.ACTIVE,
+    }).select("_id");
+    const designations = await EmployeeDesignation.find({
+        client,
+        employee: { $in: activeEmployees.map((e) => e._id) },
+    }).select("_id");
     return Compensation.find({
         employeeDesignation: { $in: designations.map((d) => d._id) },
         activeStatus: COMPENSATION_STATUS.ACTIVE,

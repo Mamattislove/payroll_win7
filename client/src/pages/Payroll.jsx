@@ -25,7 +25,11 @@ import {
     Pagination,
     ClientCombobox,
 } from "../components";
-import { COMPENSATION_STATUS, DAY_TYPES } from "../../../utils/constants";
+import {
+    COMPENSATION_STATUS,
+    DAY_TYPES,
+    EMPLOYMENT_STATUS,
+} from "../../../utils/constants";
 import { canWrite } from "../../../utils/permissions";
 import { computePayroll } from "@shared/computePayroll";
 
@@ -150,6 +154,10 @@ const EmployeeCombobox = ({ value, onChange, initialSelected, client }) => {
                     params: {
                         search: query,
                         limit: 20,
+                        // Ex-employees are not payrolled. Without this the
+                        // picker offered all 2,192 compensations, 969 of them
+                        // belonging to people who have already left.
+                        employeeStatus: EMPLOYMENT_STATUS.ACTIVE,
                         // Scopes the picker to one client when the caller
                         // supplies one, so it cannot offer employees who
                         // are not designated under it.
