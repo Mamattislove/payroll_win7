@@ -1,9 +1,15 @@
-// DOLE-standard pay multipliers keyed by dayType string value.
+// DOLE-standard pay multipliers keyed by dayType string value. This is the one
+// place rates are defined — computeAttendance() reads the same table, so a new
+// day type or a corrected rate only has to be written here.
 // regular  = multiplier applied to hourlyRate × regularHours
 // ot       = multiplier applied to hourlyRate × overtimeHours
 // nd       = multiplier applied to hourlyRate × nightPremiumHours (10% extra)
 // ndOt     = multiplier applied to hourlyRate × overtimeNightPremiumHours
-const RATE_MULTIPLIERS = {
+//
+// The leave entries price the allowance for an unworked day. computeAttendance
+// handles that case separately and falls back to Regular for a leave row that
+// does carry worked hours.
+export const RATE_MULTIPLIERS = {
     Regular: { regular: 1.0, ot: 1.25, nd: 0.1, ndOt: 0.125 },
     "Special / Rest Day": {
         regular: 1.3,
@@ -26,16 +32,30 @@ const RATE_MULTIPLIERS = {
     },
     "Legal Regular Pay": { regular: 1.0, ot: 1.25, nd: 0.1, ndOt: 0.125 },
     "Legal 3x Pay": { regular: 3.0, ot: 3.0 * 1.3, nd: 0.1, ndOt: 0.1 * 1.3 },
-    "Legal + RD 2x Pay": {
-        regular: 2.6,
-        ot: 2.6 * 1.3,
+    // The "+ RD" family is the legal-holiday rate the client pays, times the
+    // 130% rest day premium — work on a rest day earns it whether or not the
+    // holiday premium was waived. Each entry is therefore its non-RD sibling
+    // (1x / 2x / 3x above) × 1.3, and overtime is that day rate × 1.3 again,
+    // which is the DOLE rule for overtime on a rest day.
+    //
+    // Getting this wrong is what made `Legal + RD Regular Pay` price identically
+    // to `Legal Regular Pay`, and `Legal + RD 3x Pay` price at 3.38 — the
+    // OVERTIME rate of a 2x rest day, sitting in the regular-hours slot.
+    "Legal + RD Regular Pay": {
+        regular: 1.0 * 1.3,
+        ot: 1.0 * 1.3 * 1.3,
         nd: 0.1,
         ndOt: 0.1 * 1.3,
     },
-    "Legal + RD Regular Pay": { regular: 1.0, ot: 1.25, nd: 0.1, ndOt: 0.125 },
+    "Legal + RD 2x Pay": {
+        regular: 2.0 * 1.3,
+        ot: 2.0 * 1.3 * 1.3,
+        nd: 0.1,
+        ndOt: 0.1 * 1.3,
+    },
     "Legal + RD 3x Pay": {
-        regular: 3.38,
-        ot: 3.38 * 1.3,
+        regular: 3.0 * 1.3,
+        ot: 3.0 * 1.3 * 1.3,
         nd: 0.1,
         ndOt: 0.1 * 1.3,
     },

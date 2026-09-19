@@ -20,7 +20,11 @@ const C = {
 const PAGE_PAD = 14;
 const SLIP_W = (612 - PAGE_PAD * 2) / 2;
 const SLIP_H = (792 - PAGE_PAD * 2) / 3;
-const TABLE_W = 116;
+// The day table is sized to what its widest cell needs ("123.00" at 5.5pt),
+// not padded out: every point it gives up widens the left-hand column, which
+// is what caps how large the money lines can be set. The binding constraint
+// there is "LEAVE/SIL/ABS/ADJ" against a six-figure amount.
+const TABLE_W = 86;
 
 const s = StyleSheet.create({
     page: {
@@ -45,39 +49,39 @@ const s = StyleSheet.create({
 
     // Masthead spans the whole slip so the logo and company name sit on the
     // slip's centre line, not the centre of the left-hand column.
-    header: { alignItems: "center", marginBottom: 3 },
-    logo: { width: 15, height: 15, objectFit: "contain" },
-    coName: { fontFamily: "Helvetica-Bold", fontSize: 5.4, textAlign: "center" },
-    coAddr: { fontSize: 3.5, textAlign: "center" },
+    header: { alignItems: "center", marginBottom: 4 },
+    logo: { width: 18, height: 18, objectFit: "contain" },
+    coName: { fontFamily: "Helvetica-Bold", fontSize: 8, textAlign: "center" },
+    coAddr: { fontSize: 5, textAlign: "center" },
 
     // body: payslip on the left, the days it was built from on the right
     body: { flexDirection: "row", flex: 1 },
     left: { flex: 1, paddingRight: 4 },
 
-    slipLabel: { fontFamily: "Helvetica-Bold", fontSize: 4.8, marginBottom: 0.8 },
-    meta: { fontSize: 4.4, marginBottom: 0.8 },
+    slipLabel: { fontFamily: "Helvetica-Bold", fontSize: 6.4, marginBottom: 1.2 },
+    meta: { fontSize: 5.8, marginBottom: 1.2 },
 
     colsHead: { flexDirection: "row", marginTop: 2, marginBottom: 1 },
-    headEarn: { fontFamily: "Helvetica-Bold", fontSize: 4.8, width: "48%" },
-    headDed: { fontFamily: "Helvetica-Bold", fontSize: 4.8 },
+    headEarn: { fontFamily: "Helvetica-Bold", fontSize: 6.4, width: "50%" },
+    headDed: { fontFamily: "Helvetica-Bold", fontSize: 6.4 },
 
     cols: { flexDirection: "row", flex: 1 },
-    colEarn: { width: "48%", paddingRight: 3 },
+    colEarn: { width: "50%", paddingRight: 3 },
     colDed: { flex: 1 },
 
-    line: { flexDirection: "row", justifyContent: "space-between", marginBottom: 0.7 },
-    lineLabel: { fontSize: 4.3 },
-    lineLabelBold: { fontSize: 4.6, fontFamily: "Helvetica-Bold" },
-    lineAmt: { fontSize: 4.3, textAlign: "right" },
-    lineAmtBold: { fontSize: 4.6, fontFamily: "Helvetica-Bold", textAlign: "right" },
+    line: { flexDirection: "row", justifyContent: "space-between", marginBottom: 1.2 },
+    lineLabel: { fontSize: 5.8 },
+    lineLabelBold: { fontSize: 6.1, fontFamily: "Helvetica-Bold" },
+    lineAmt: { fontSize: 5.8, textAlign: "right" },
+    lineAmtBold: { fontSize: 6.1, fontFamily: "Helvetica-Bold", textAlign: "right" },
 
     // right: the day table
     table: { width: TABLE_W },
     tRow: { flexDirection: "row" },
-    tHeadTop: { fontSize: 3.6, fontFamily: "Helvetica-Bold", textAlign: "center" },
-    tHead: { fontSize: 3.6, fontFamily: "Helvetica-Bold", textAlign: "center" },
-    tCell: { fontSize: 3.9, textAlign: "center" },
-    tCellDay: { fontSize: 3.9, textAlign: "center" },
+    tHeadTop: { fontSize: 5.2, fontFamily: "Helvetica-Bold", textAlign: "center" },
+    tHead: { fontSize: 5.2, fontFamily: "Helvetica-Bold", textAlign: "center" },
+    tCell: { fontSize: 5.5, textAlign: "center" },
+    tCellDay: { fontSize: 5.5, textAlign: "center" },
     tRule: {
         borderBottomWidth: 0.5,
         borderBottomColor: C.rule,
@@ -92,11 +96,11 @@ const s = StyleSheet.create({
         paddingTop: 0.8,
         marginTop: 0.8,
     },
-    tTotalText: { fontSize: 3.9, fontFamily: "Helvetica-Bold", textAlign: "center" },
+    tTotalText: { fontSize: 5.5, fontFamily: "Helvetica-Bold", textAlign: "center" },
 });
 
 // Column widths inside the day table, summing to TABLE_W.
-const COL = { day: 18, reg: 26, ot: 24, rnd: 24, ond: 24 };
+const COL = { day: 12, reg: 18.5, ot: 18.5, rnd: 18.5, ond: 18.5 };
 
 const Line = ({ label, value, bold }) => (
     <View style={s.line}>

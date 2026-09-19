@@ -19,10 +19,10 @@ export const DAY_TYPES = {
     LEAVE_WITH_PAY: "Leave With Pay",
     SPECIAL_AND_REST_DAY: "Special + Rest Day",
     LEGAL_REGULAR_PAY: "Legal Regular Pay",
-    LEGAL_3X_PAY: "Legal 3x Pay",
-    LEGAL_RD_2X_PAY: "Legal + RD 2x Pay",
     LEGAL_RD_REGULAR_PAY: "Legal + RD Regular Pay",
+    LEGAL_RD_2X_PAY: "Legal + RD 2x Pay",
     LEGAL_RD_3X_PAY: "Legal + RD 3x Pay",
+    LEGAL_3X_PAY: "Legal 3x Pay",
     LEAVE_HALFDAY: "Leave Half Day",
 };
 

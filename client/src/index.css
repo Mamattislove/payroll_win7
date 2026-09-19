@@ -8,3 +8,41 @@
    directory holds build tooling, never markup, so nothing is lost by skipping
    it. */
 @source not "../scripts";
+
+/* Slim scrollbar for panels that scroll inside a dark surface, where the
+   default is a wide light-grey slab against near-black.
+
+   The two browsers this app targets need different halves of this. Chrome and
+   Edge 109 only understand the ::-webkit-scrollbar pseudo-elements. Firefox 115
+   ESR only understands scrollbar-width / scrollbar-color, which Chrome did not
+   ship until 121 -- so that half sits behind an @supports guard, which is both
+   what serves the right engine and what keeps check-legacy-browsers.mjs happy:
+   it fails the build on an unguarded scrollbar-color.
+
+   Colours are plain hex on purpose. Tailwind's slate palette is authored in
+   oklch(), which Chrome 109 cannot parse -- referencing the tokens here would
+   render the thumb transparent on exactly the browsers this is aimed at. */
+.scrollbar-slim::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+
+.scrollbar-slim::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.scrollbar-slim::-webkit-scrollbar-thumb {
+    background-color: #475569; /* slate-600 */
+    border-radius: 9999px;
+}
+
+.scrollbar-slim::-webkit-scrollbar-thumb:hover {
+    background-color: #64748b; /* slate-500 */
+}
+
+@supports (scrollbar-color: auto) {
+    .scrollbar-slim {
+        scrollbar-width: thin;
+        scrollbar-color: #475569 transparent;
+    }
+}

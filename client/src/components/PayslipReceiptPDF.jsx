@@ -9,7 +9,7 @@ import { f2, isoDay, buildSlipModel } from "./payslipData";
 //
 // Laid out two across and two down rather than four stacked: a slip has to
 // carry the payslip and the eleven-line receipt one above the other, which
-// needs roughly 200pt of height. Four full-width rows would leave 191pt each
+// needs roughly 265pt of height. Four full-width rows would leave 191pt each
 // and overflow, while a 2x2 grid gives 382pt with room to spare.
 
 const C = { rule: "#666666", cut: "#999999" };
@@ -18,7 +18,10 @@ const C = { rule: "#666666", cut: "#999999" };
 const PAGE_PAD = 14;
 const SLIP_W = (612 - PAGE_PAD * 2) / 2;
 const SLIP_H = (792 - PAGE_PAD * 2) / 2;
-const DAY_TABLE_W = 116;
+// Sized to its widest cell rather than padded out, so the points go to the
+// left-hand column where they let the money lines be set larger. See the note
+// in PayslipCompactPDF.
+const DAY_TABLE_W = 86;
 
 const s = StyleSheet.create({
     page: {
@@ -36,40 +39,40 @@ const s = StyleSheet.create({
         borderColor: C.rule,
         borderStyle: "solid",
         paddingVertical: 5,
-        paddingHorizontal: 8,
+        paddingHorizontal: 6,
         flexDirection: "column",
     },
 
     // masthead, centred on the slip's own axis
-    header: { alignItems: "center", marginBottom: 2 },
-    logo: { width: 15, height: 15, objectFit: "contain" },
-    coName: { fontFamily: "Helvetica-Bold", fontSize: 6, textAlign: "center" },
-    coAddr: { fontSize: 4, textAlign: "center" },
+    header: { alignItems: "center", marginBottom: 3 },
+    logo: { width: 18, height: 18, objectFit: "contain" },
+    coName: { fontFamily: "Helvetica-Bold", fontSize: 8, textAlign: "center" },
+    coAddr: { fontSize: 5, textAlign: "center" },
 
     body: { flexDirection: "row" },
-    left: { flex: 1, paddingRight: 6 },
+    left: { flex: 1, paddingRight: 4 },
 
-    slipLabel: { fontFamily: "Helvetica-Bold", fontSize: 5.2, marginBottom: 1 },
-    meta: { fontSize: 5, marginBottom: 1 },
+    slipLabel: { fontFamily: "Helvetica-Bold", fontSize: 6.4, marginBottom: 1.2 },
+    meta: { fontSize: 5.8, marginBottom: 1.2 },
 
     colsHead: { flexDirection: "row", marginTop: 2, marginBottom: 1 },
-    headEarn: { fontFamily: "Helvetica-Bold", fontSize: 5.2, width: "47%" },
-    headDed: { fontFamily: "Helvetica-Bold", fontSize: 5.2 },
+    headEarn: { fontFamily: "Helvetica-Bold", fontSize: 6.4, width: "50%" },
+    headDed: { fontFamily: "Helvetica-Bold", fontSize: 6.4 },
     cols: { flexDirection: "row" },
-    colEarn: { width: "47%", paddingRight: 4 },
+    colEarn: { width: "50%", paddingRight: 3 },
     colDed: { flex: 1 },
 
-    line: { flexDirection: "row", justifyContent: "space-between", marginBottom: 0.8 },
-    lbl: { fontSize: 4.8 },
-    lblB: { fontSize: 5.1, fontFamily: "Helvetica-Bold" },
-    amt: { fontSize: 4.8, textAlign: "right" },
-    amtB: { fontSize: 5.1, fontFamily: "Helvetica-Bold", textAlign: "right" },
+    line: { flexDirection: "row", justifyContent: "space-between", marginBottom: 1.2 },
+    lbl: { fontSize: 5.8 },
+    lblB: { fontSize: 6.1, fontFamily: "Helvetica-Bold" },
+    amt: { fontSize: 5.8, textAlign: "right" },
+    amtB: { fontSize: 6.1, fontFamily: "Helvetica-Bold", textAlign: "right" },
 
     // day table
     table: { width: DAY_TABLE_W },
     tRow: { flexDirection: "row" },
-    tHead: { fontSize: 4.2, fontFamily: "Helvetica-Bold", textAlign: "center" },
-    tCell: { fontSize: 4.4, textAlign: "center" },
+    tHead: { fontSize: 5.2, fontFamily: "Helvetica-Bold", textAlign: "center" },
+    tCell: { fontSize: 5.5, textAlign: "center" },
     tRule: {
         borderBottomWidth: 0.5,
         borderBottomColor: C.rule,
@@ -84,7 +87,7 @@ const s = StyleSheet.create({
         paddingTop: 0.8,
         marginTop: 0.8,
     },
-    tTotalText: { fontSize: 4.4, fontFamily: "Helvetica-Bold", textAlign: "center" },
+    tTotalText: { fontSize: 5.5, fontFamily: "Helvetica-Bold", textAlign: "center" },
 
     // tear line between the payslip and the receipt
     cut: {
@@ -97,24 +100,24 @@ const s = StyleSheet.create({
     // acknowledgment receipt
     ackTitle: {
         fontFamily: "Helvetica-Bold",
-        fontSize: 5.6,
+        fontSize: 6.8,
         textAlign: "center",
         marginBottom: 2,
     },
     ackBody: { flexDirection: "row" },
-    ackLeft: { width: "42%", paddingRight: 8, justifyContent: "center" },
+    ackLeft: { width: "46%", paddingRight: 6, justifyContent: "center" },
     ackRight: { flex: 1 },
     ackPartHead: {
         fontFamily: "Helvetica-Bold",
-        fontSize: 5.2,
+        fontSize: 6.4,
         textAlign: "center",
         marginBottom: 1,
     },
-    ackMetaLabel: { fontSize: 4.8, marginBottom: 0.3 },
-    ackMetaValue: { fontSize: 5, fontFamily: "Helvetica-Bold", marginBottom: 1.5 },
+    ackMetaLabel: { fontSize: 5.8, marginBottom: 0.3 },
+    ackMetaValue: { fontSize: 6.1, fontFamily: "Helvetica-Bold", marginBottom: 1.5 },
 });
 
-const COL = { day: 18, reg: 26, ot: 24, rnd: 24, ond: 24 };
+const COL = { day: 12, reg: 18.5, ot: 18.5, rnd: 18.5, ond: 18.5 };
 
 const Line = ({ label, value, bold }) => (
     <View style={s.line}>
