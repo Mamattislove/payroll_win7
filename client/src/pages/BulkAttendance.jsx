@@ -102,7 +102,7 @@ const blankRow = (date, holidayMap = {}, leaveMap = {}) => {
         nightPremiumHours: "",
         overtimeNightPremiumHours: "",
         lateMin: "",
-        undertimeMin: "",
+        undertimeHr: "",
         remarks,
     };
 };
@@ -110,10 +110,11 @@ const blankRow = (date, holidayMap = {}, leaveMap = {}) => {
 const numberOrUndefined = (val) =>
     val === "" || val === null || val === undefined ? undefined : Number(val);
 
-// Late and undertime are stored as HOURS, because pay is computed per hour
-// (lateHr * perHour in computeAttendance). A timesheet reports them in
-// minutes, so the grid takes minutes and converts at the two API
-// boundaries -- typing 30 must never reach the server as 30 hours.
+// Late and undertime are both stored as HOURS, because pay is computed per hour
+// (lateHr * perHour in computeAttendance). Undertime is also entered in hours,
+// so it passes straight through. Late is entered in minutes -- the unit a
+// timesheet reports it in -- and converts at the two API boundaries, so typing
+// 30 must never reach the server as 30 hours.
 const MINUTES_PER_HOUR = 60;
 
 const minutesToHours = (minutes) => {
@@ -218,7 +219,7 @@ const rowTotalPay = (row, dailyRate) => {
         nightPremiumHours: Number(row.nightPremiumHours) || 0,
         overtimeNightPremiumHours: Number(row.overtimeNightPremiumHours) || 0,
         lateHr: (Number(row.lateMin) || 0) / MINUTES_PER_HOUR,
-        undertimeHr: (Number(row.undertimeMin) || 0) / MINUTES_PER_HOUR,
+        undertimeHr: Number(row.undertimeHr) || 0,
     });
     return (
         computed.regularHoursPay +
@@ -610,7 +611,7 @@ const SummaryModal = ({
         nightPremiumHours: sum("nightPremiumHours"),
         overtimeNightPremiumHours: sum("overtimeNightPremiumHours"),
         lateMin: sum("lateMin"),
-        undertimeMin: sum("undertimeMin"),
+        undertimeHr: sum("undertimeHr"),
     };
     const totalHours =
         totals.regularHours +
@@ -749,9 +750,8 @@ const SummaryModal = ({
                                             </td>
                                             <td className="px-3 py-1.5 text-right text-slate-600">
                                                 {(
-                                                    Number(row.undertimeMin) ||
-                                                    0
-                                                ).toFixed(0)}
+                                                    Number(row.undertimeHr) || 0
+                                                ).toFixed(2)}
                                             </td>
                                             <td className="px-3 py-1.5 text-right font-medium text-slate-800">
                                                 ₱
@@ -791,8 +791,8 @@ const SummaryModal = ({
                             value={totals.lateMin.toFixed(0)}
                         />
                         <StatTile
-                            label="Undertime (mins)"
-                            value={totals.undertimeMin.toFixed(0)}
+                            label="Undertime (hrs)"
+                            value={totals.undertimeHr.toFixed(2)}
                         />
                         <StatTile
                             label="Work Hours"
@@ -855,7 +855,7 @@ const toRecord = (r) => ({
     nightPremiumHours: numberOrUndefined(r.nightPremiumHours),
     overtimeNightPremiumHours: numberOrUndefined(r.overtimeNightPremiumHours),
     lateHr: minutesToHours(r.lateMin),
-    undertimeHr: minutesToHours(r.undertimeMin),
+    undertimeHr: numberOrUndefined(r.undertimeHr),
     remarks: r.remarks || undefined,
 });
 
@@ -905,7 +905,7 @@ const RowsEditor = ({
                             overtimeNightPremiumHours:
                                 existing.overtimeNightPremiumHours ?? "",
                             lateMin: hoursToMinutes(existing.lateHr),
-                            undertimeMin: hoursToMinutes(existing.undertimeHr),
+                            undertimeHr: existing.undertimeHr ?? "",
                             remarks: existing.remarks || row.remarks,
                         };
                     }),
@@ -1011,7 +1011,7 @@ const RowsEditor = ({
         { field: "nightPremiumHours", label: "Night Prem (hrs)" },
         { field: "overtimeNightPremiumHours", label: "OT Night (hrs)" },
         { field: "lateMin", label: "Late (mins)" },
-        { field: "undertimeMin", label: "Undertime (mins)" },
+        { field: "undertimeHr", label: "Undertime (hrs)" },
     ];
 
     return (
@@ -1213,7 +1213,7 @@ const RowsEditor = ({
                                     Late (mins)
                                 </th>
                                 <th className="px-3 py-3 text-right min-w-20">
-                                    Undertime (mins)
+                                    Undertime (hrs)
                                 </th>
                                 <th className="px-3 py-3 text-right min-w-22.5">
                                     Total Pay
@@ -1428,12 +1428,12 @@ const RowsEditor = ({
                                         <input
                                             type="number"
                                             min={0}
-                                            step="1"
-                                            value={row.undertimeMin}
+                                            step="any"
+                                            value={row.undertimeHr}
                                             onChange={(e) =>
                                                 updateRow(
                                                     idx,
-                                                    "undertimeMin",
+                                                    "undertimeHr",
                                                     e.target.value,
                                                 )
                                             }
@@ -1534,17 +1534,18 @@ const RowsEditor = ({
                                             .toFixed(4),
                                     ],
                                     [
-                                        "Late",
+                                        "Late (mins)",
                                         rows
                                             .reduce(
                                                 (s, r) =>
-                                                    s + (Number(r.lateHr) || 0),
+                                                    s +
+                                                    (Number(r.lateMin) || 0),
                                                 0,
                                             )
-                                            .toFixed(4),
+                                            .toFixed(0),
                                     ],
                                     [
-                                        "Undertime",
+                                        "Undertime (hrs)",
                                         rows
                                             .reduce(
                                                 (s, r) =>
