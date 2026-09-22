@@ -252,6 +252,13 @@ const DeductionSection = ({ records, employeeId, payrollId, onChanged, editable 
 
     const total = records.reduce((sum, r) => sum + Number(r.amount || 0), 0);
 
+    // One payment per deduction record per payroll. `records` refreshes after
+    // every add and remove, so this list narrows and widens with it.
+    const linkedRecordIds = new Set(
+        records.map((r) => r.deductionRecord?._id ?? r.deductionRecord).filter(Boolean),
+    );
+    const availableRecords = existingRecords.filter((rec) => !linkedRecordIds.has(rec._id));
+
     const openAdd = async () => {
         setAdding(true);
         setSelectedRecord(null);
@@ -283,7 +290,7 @@ const DeductionSection = ({ records, employeeId, payrollId, onChanged, editable 
 
     const handleAdd = async (e) => {
         e.preventDefault();
-        if (!selectedRecord) return;
+        if (!selectedRecord || linkedRecordIds.has(selectedRecord._id)) return;
         setSaving(true);
         try {
             await customFetch.post("/deduction-payments", {
@@ -368,6 +375,12 @@ const DeductionSection = ({ records, employeeId, payrollId, onChanged, editable 
                 <form onSubmit={handleAdd} className="mt-3 pt-3 border-t border-slate-100 flex flex-col gap-2">
                     {loadingRecords ? (
                         <p className="text-xs text-slate-400 py-1">Loading records…</p>
+                    ) : availableRecords.length === 0 ? (
+                        <p className="text-xs text-slate-400 py-1">
+                            {existingRecords.length === 0
+                                ? "No deduction record for this employee."
+                                : "Every deduction record is already on this payroll."}
+                        </p>
                     ) : (
                         <select
                             required
@@ -376,7 +389,7 @@ const DeductionSection = ({ records, employeeId, payrollId, onChanged, editable 
                             className={inputCls}
                         >
                             <option value="">— Select deduction record —</option>
-                            {existingRecords.map((rec) => (
+                            {availableRecords.map((rec) => (
                                 <option key={rec._id} value={rec._id}>
                                     {rec.name}
                                     {rec.deductionType?.deductionName
@@ -389,23 +402,27 @@ const DeductionSection = ({ records, employeeId, payrollId, onChanged, editable 
                             ))}
                         </select>
                     )}
-                    <input
-                        type="number"
-                        min={0}
-                        step={0.01}
-                        placeholder="Amount"
-                        required
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        className={inputCls}
-                    />
-                    <button
-                        type="submit"
-                        disabled={saving || !selectedRecord}
-                        className="py-1.5 rounded bg-slate-900 text-white text-xs hover:bg-slate-700 disabled:opacity-60"
-                    >
-                        {saving ? "Adding..." : "Add"}
-                    </button>
+                    {availableRecords.length > 0 && (
+                        <>
+                            <input
+                                type="number"
+                                min={0}
+                                step={0.01}
+                                placeholder="Amount"
+                                required
+                                value={amount}
+                                onChange={(e) => setAmount(e.target.value)}
+                                className={inputCls}
+                            />
+                            <button
+                                type="submit"
+                                disabled={saving || !selectedRecord}
+                                className="py-1.5 rounded bg-slate-900 text-white text-xs hover:bg-slate-700 disabled:opacity-60"
+                            >
+                                {saving ? "Adding..." : "Add"}
+                            </button>
+                        </>
+                    )}
                 </form>
             )}
             {dedConfirmModal}
@@ -603,6 +620,14 @@ const SavingsSection = ({ records, employeeId, payrollId, onChanged, editable })
 
     const total = records.reduce((sum, r) => sum + Number(r.amount || 0), 0);
 
+    // A plan already on this payroll must not be offered again: the payroll run
+    // creates a record for every active plan, so adding it a second time just
+    // deducts it twice.
+    const linkedSavingsIds = new Set(
+        records.map((r) => r.savings?._id ?? r.savings).filter(Boolean),
+    );
+    const availableSavings = savingsList.filter((s) => !linkedSavingsIds.has(s._id));
+
     const openAdd = async () => {
         setAdding(true);
         setSelectedSavings(null);
@@ -634,7 +659,7 @@ const SavingsSection = ({ records, employeeId, payrollId, onChanged, editable })
 
     const handleAdd = async (e) => {
         e.preventDefault();
-        if (!selectedSavings) return;
+        if (!selectedSavings || linkedSavingsIds.has(selectedSavings._id)) return;
         setSaving(true);
         try {
             await customFetch.post("/savings-records", {
@@ -724,6 +749,12 @@ const SavingsSection = ({ records, employeeId, payrollId, onChanged, editable })
                 >
                     {loadingList ? (
                         <p className="text-xs text-slate-400 py-1">Loading savings plans…</p>
+                    ) : availableSavings.length === 0 ? (
+                        <p className="text-xs text-slate-400 py-1">
+                            {savingsList.length === 0
+                                ? "No active savings plan for this employee."
+                                : "Every active savings plan is already on this payroll."}
+                        </p>
                     ) : (
                         <select
                             required
@@ -732,30 +763,34 @@ const SavingsSection = ({ records, employeeId, payrollId, onChanged, editable })
                             className={inputCls}
                         >
                             <option value="">— Select savings plan —</option>
-                            {savingsList.map((s) => (
+                            {availableSavings.map((s) => (
                                 <option key={s._id} value={s._id}>
                                     {`Target: ₱${Number(s.savingsTarget).toLocaleString("en-PH", { minimumFractionDigits: 2 })} — Cutoff: ₱${Number(s.cutoffDeductionAmount).toLocaleString("en-PH", { minimumFractionDigits: 2 })}`}
                                 </option>
                             ))}
                         </select>
                     )}
-                    <input
-                        type="number"
-                        min={0}
-                        step={0.01}
-                        placeholder="Amount"
-                        required
-                        value={amount}
-                        onChange={(e) => setAmount(e.target.value)}
-                        className={inputCls}
-                    />
-                    <button
-                        type="submit"
-                        disabled={saving || !selectedSavings}
-                        className="py-1.5 rounded bg-slate-900 text-white text-xs hover:bg-slate-700 disabled:opacity-60"
-                    >
-                        {saving ? "Adding..." : "Add"}
-                    </button>
+                    {availableSavings.length > 0 && (
+                        <>
+                            <input
+                                type="number"
+                                min={0}
+                                step={0.01}
+                                placeholder="Amount"
+                                required
+                                value={amount}
+                                onChange={(e) => setAmount(e.target.value)}
+                                className={inputCls}
+                            />
+                            <button
+                                type="submit"
+                                disabled={saving || !selectedSavings}
+                                className="py-1.5 rounded bg-slate-900 text-white text-xs hover:bg-slate-700 disabled:opacity-60"
+                            >
+                                {saving ? "Adding..." : "Add"}
+                            </button>
+                        </>
+                    )}
                 </form>
             )}
             {confirmModal}

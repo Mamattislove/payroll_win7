@@ -514,7 +514,18 @@ async function generatePayrollFor(
         sssEmployerContribution: rawSssEmp,
         philhealthEmployerContribution: rawPhEmp,
         pagibigEmployerContribution: rawPiEmp,
-    } = await computeGovContributions(compensationDoc, year);
+    } = await computeGovContributions(compensationDoc, year, {
+        // Earnings and allowances are attached below, after the payroll exists,
+        // so the gross known here is attendance pay only. recomputePayrollTotals
+        // restates a "gross pay" employee's contributions once they are on.
+        periodGross:
+            regularPay +
+            regularOtPay +
+            holidayRestDayPay +
+            holidayRestDayOtPay +
+            nightDiffPay +
+            leavePay,
+    });
 
     // Government contributions are monthly obligations, so each run deducts
     // only its share of the month (see utils/contributionFactor.js).

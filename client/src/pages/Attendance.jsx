@@ -88,6 +88,12 @@ const Field = ({ label, children }) => (
     </div>
 );
 
+// Night hours are the slice of the hours worked that fell after 10pm, not
+// hours on top of them: a night shift is still 8 regular hours, 4 of which
+// happened to be at night. Keying it as 4 + 4 pays the employee half a day and
+// counts the shift as half a day worked in payroll (daysWorked = regularHours
+// / 8). OT-ND is the same slice against overtimeHours — OT-ND with no OT behind
+// it pays the 12.5% premium on overtime nobody was paid the 1.25x base for.
 const SHORTCUT_CONFIGS = [
     {
         label: "Day No OT",
@@ -116,7 +122,7 @@ const SHORTCUT_CONFIGS = [
         icon: FiMoon,
         cls: "bg-indigo-50 text-indigo-700",
         values: {
-            regularHours: 4,
+            regularHours: 8,
             overtimeHours: 0,
             nightPremiumHours: 4,
             overtimeNightPremiumHours: 0,
@@ -127,8 +133,8 @@ const SHORTCUT_CONFIGS = [
         icon: FiMoon,
         cls: "bg-indigo-50 text-indigo-700",
         values: {
-            regularHours: 4,
-            overtimeHours: 0,
+            regularHours: 8,
+            overtimeHours: 4,
             nightPremiumHours: 4,
             overtimeNightPremiumHours: 4,
         },

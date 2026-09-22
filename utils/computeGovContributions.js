@@ -1,8 +1,71 @@
 import SSSRate from "../models/SSSRate.js";
 import PhilHealthRate from "../models/PhilHealthRate.js";
 import PagIbigRate from "../models/PagIbigRate.js";
+import {
+    SSS_CONTRIBUTION_BASIS,
+    PAYROLL_PERIODS,
+} from "./constants.js";
 
 const r2 = (n) => Math.round(n * 100) / 100;
+
+// Service incentive leave is five days a year (Labor Code art. 95). Spread over
+// twelve months that is the amount "basic pay w/ SIL" adds to the basic rate
+// before the bracket is looked up. One constant, one place to correct it.
+const SIL_DAYS_PER_YEAR = 5;
+const MONTHS_PER_YEAR = 12;
+
+// How many payroll runs make up a month, used to turn one period's earnings
+// back into the monthly figure the SSS/PhilHealth/Pag-IBIG tables are indexed
+// by. It is the inverse of contributionFactor: that splits a monthly obligation
+// across runs, this reassembles a monthly wage out of them, and the two must
+// multiply to 1 for every period -- including the unset case, where
+// contributionFactor deducts the whole monthly amount in one run and so this
+// must treat the run as the whole month rather than doubling it.
+const runsPerMonth = (payrollPeriod) => {
+    switch (payrollPeriod) {
+        case PAYROLL_PERIODS.WEEKLY:
+            return 4;
+        case PAYROLL_PERIODS.SEMI_MONTHLY:
+        case PAYROLL_PERIODS.DAILY:
+            return 2;
+        case PAYROLL_PERIODS.MONTHLY:
+        default:
+            return 1;
+    }
+};
+
+/**
+ * The monthly wage the contribution table is indexed by, for one basis.
+ *
+ * `periodGross` is what the employee actually earned this run -- attendance pay
+ * plus earnings and allowances, the same figure derivePayrollTotals calls
+ * grossPay. It is scaled up to a month because the tables are monthly, and it
+ * is only consulted for the "gross pay" basis; the others read the standing
+ * monthly rate and so do not move with overtime.
+ */
+export function bracketWage(basis, compensation, periodGross) {
+    const { monthlyRate = 0, dailyRate = 0, payrollPeriod } = compensation;
+
+    switch (basis) {
+        case SSS_CONTRIBUTION_BASIS.GROSS_PAY:
+            // No gross to read (a payroll being created before its records are
+            // attached) falls back to the basic rate rather than to zero, which
+            // would silently put the employee in the lowest bracket.
+            return periodGross > 0
+                ? r2(periodGross * runsPerMonth(payrollPeriod))
+                : monthlyRate;
+
+        case SSS_CONTRIBUTION_BASIS.BASIC_WITH_SIL:
+            return r2(
+                monthlyRate +
+                    (dailyRate * SIL_DAYS_PER_YEAR) / MONTHS_PER_YEAR,
+            );
+
+        case SSS_CONTRIBUTION_BASIS.BASIC_PAY:
+        default:
+            return monthlyRate;
+    }
+}
 
 async function getSSSBracket(monthlyRate, year) {
     let bracket = await SSSRate.findOne({
@@ -111,9 +174,12 @@ async function getPagIbigContributions(monthlyRate, year) {
  * @returns {{ sssContribution, philhealthContribution, pagibigContribution,
  *             sssEmployerContribution, philhealthEmployerContribution, pagibigEmployerContribution }}
  */
-export async function computeGovContributions(compensation, year) {
+export async function computeGovContributions(
+    compensation,
+    year,
+    { periodGross = 0 } = {},
+) {
     const {
-        monthlyRate = 0,
         sssContributionBasis,
         philhealthContributionBasis,
         pagibigContributionBasis,
@@ -122,24 +188,41 @@ export async function computeGovContributions(compensation, year) {
         pagibigOverwriteAmount = 0,
     } = compensation;
 
+    // An unset basis reads as basic pay, which is the figure this file computed
+    // for every employee before the basis was honoured at all.
+    const sssBasis = sssContributionBasis || SSS_CONTRIBUTION_BASIS.BASIC_PAY;
+    const phBasis =
+        philhealthContributionBasis || SSS_CONTRIBUTION_BASIS.BASIC_PAY;
+    const piBasis =
+        pagibigContributionBasis || SSS_CONTRIBUTION_BASIS.BASIC_PAY;
+
     const [sss, ph, pi] = await Promise.all([
-        sssContributionBasis === "no deduction"
+        sssBasis === "no deduction"
             ? { employee: 0, employer: 0 }
             : sssOverwriteAmount > 0
               ? { employee: r2(sssOverwriteAmount), employer: 0 }
-              : getSSSContributions(monthlyRate, year),
+              : getSSSContributions(
+                    bracketWage(sssBasis, compensation, periodGross),
+                    year,
+                ),
 
-        philhealthContributionBasis === "no deduction"
+        phBasis === "no deduction"
             ? { employee: 0, employer: 0 }
             : philhealthOverwriteAmount > 0
               ? { employee: r2(philhealthOverwriteAmount), employer: 0 }
-              : getPhilHealthContributions(monthlyRate, year),
+              : getPhilHealthContributions(
+                    bracketWage(phBasis, compensation, periodGross),
+                    year,
+                ),
 
-        pagibigContributionBasis === "no deduction"
+        piBasis === "no deduction"
             ? { employee: 0, employer: 0 }
             : pagibigOverwriteAmount > 0
               ? { employee: r2(pagibigOverwriteAmount), employer: 0 }
-              : getPagIbigContributions(monthlyRate, year),
+              : getPagIbigContributions(
+                    bracketWage(piBasis, compensation, periodGross),
+                    year,
+                ),
     ]);
 
     return {

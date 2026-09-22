@@ -275,21 +275,32 @@ const SavingsModal = ({ initial, onClose, onSaved }) => {
 const SavingsRecordsModal = ({ plan, onClose }) => {
     const [records, setRecords] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
         setLoading(true);
+        setLoadError(false);
         customFetch
             .get(`/savings-records?savings=${plan._id}&limit=500`)
             .then(({ data }) => {
                 if (!cancelled) setRecords(data.savingsRecords || []);
             })
-            .catch(() => {})
+            .catch(() => {
+                if (!cancelled) setLoadError(true);
+            })
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
     }, [plan._id]);
 
-    const totalDeducted = records.reduce((s, r) => s + Number(r.amountDeducted || 0), 0);
+    // The payroll run writes each cutoff deduction as `amount`, and every server
+    // total -- payroll, payslip, the variance reports -- sums that field. Reading
+    // `amountDeducted` here showed a dash per row, ₱0.00 saved and the full
+    // target still remaining, however much had actually been deducted. It stays
+    // as a fallback only for rows posted straight to /savings-records, which the
+    // validator still accepts under that name.
+    const recordAmount = (r) => Number(r.amount ?? r.amountDeducted ?? 0);
+    const totalDeducted = records.reduce((s, r) => s + recordAmount(r), 0);
     const remaining = Math.max(0, (plan.savingsTarget || 0) - totalDeducted);
 
     return (
@@ -329,6 +340,8 @@ const SavingsRecordsModal = ({ plan, onClose }) => {
                 <div className="overflow-y-auto flex-1">
                     {loading ? (
                         <p className="text-center text-slate-400 py-10 text-sm">Loading records…</p>
+                    ) : loadError ? (
+                        <p className="text-center text-amber-600 py-10 text-sm">Could not load deductions — the totals above are not reliable.</p>
                     ) : records.length === 0 ? (
                         <p className="text-center text-slate-400 py-10 text-sm">No deductions recorded yet.</p>
                     ) : (
@@ -345,7 +358,7 @@ const SavingsRecordsModal = ({ plan, onClose }) => {
                                     <tr key={r._id} className="hover:bg-slate-50">
                                         <td className="px-4 py-2.5 text-slate-400 text-xs">{idx + 1}</td>
                                         <td className="px-4 py-2.5 text-slate-600">{fmtDate(r.createdAt)}</td>
-                                        <td className="px-4 py-2.5 text-right font-medium text-slate-800">{fmt(r.amountDeducted)}</td>
+                                        <td className="px-4 py-2.5 text-right font-medium text-slate-800">{fmt(recordAmount(r))}</td>
                                     </tr>
                                 ))}
                             </tbody>

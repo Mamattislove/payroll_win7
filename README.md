@@ -450,4 +450,5 @@ Regular holiday, night shift, OT 2 x 1.1 x 1.3 = 2.86 or 286%
 Reg. holiday, rest day, night shift, OT 2.6 x 1.1 x 1.3 = 3.718 or 371.8%
 Double holiday, night shift, OT 3 x 1.1 x 1.3 = 4.29 or 429%
 Double holiday, rest day, night shift, OT 3.9 x 1.1 x 1.3 = 5.577 or 557.7%
+
 # payroll

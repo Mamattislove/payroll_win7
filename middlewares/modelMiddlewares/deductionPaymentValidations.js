@@ -16,6 +16,19 @@ export const validateDeductionPaymentInput = withValidationErrors([
         .custom(async (id, { req }) => {
             if (!id) return;
             await existingDeductionRecord(id);
+            // Scoped to the payroll whenever there is one: both cutoffs of a
+            // semi-monthly period fall in the same calendar month, so the
+            // month-wide rule below rejected the second cutoff's own deduction.
+            // A payment with no payroll behind it keeps the month rule.
+            if (req.body.payroll) {
+                const duplicate = await DeductionPayment.findOne({
+                    deductionRecord: id,
+                    payroll: req.body.payroll,
+                });
+                if (duplicate)
+                    throw new Error("this deduction is already on this payroll");
+                return;
+            }
             const date = req.body.deductionDate ? new Date(req.body.deductionDate) : new Date();
             const startOfMonth = new Date(date.getFullYear(), date.getMonth(), 1);
             const endOfMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59, 999);

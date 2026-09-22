@@ -8,16 +8,16 @@ import { RATE_MULTIPLIERS } from "./attendanceRates.js";
 // Night differential is a premium on hours that are ALREADY being paid, not pay
 // for extra hours: nightPremiumHours is the slice of regularHours that fell
 // after 10pm, and overtimeNightPremiumHours the same slice of overtimeHours.
-// Both are charged as a flat percentage of the base hourly rate — 10% for
-// straight time, 12.5% where overtime runs at 1.25× and 13% where it runs at
-// 1.3×. The percentage does not scale with the day-type multiplier, which is
-// why the table's `nd` / `ndOt` are flat figures rather than products of its
-// `regular`.
+// Both are charged as 10% of what that hour is ALREADY worth, so the premium
+// scales with the day-type multiplier, and an OT night hour scales with the
+// overtime multiplier on top of that — a legal-holiday night hour is 0.20×,
+// its OT night hour 0.26×. attendanceRates.js reproduces the client's rate
+// sheet and derives `nd` / `ndOt` from `regular` / `ot` for that reason.
 //
-// This is the basis the attendance in this database was built on: an imported
-// row reading regHRS 8 / regPay 611.93 also carries regNP 8 / regNPPay 61.19,
-// exactly 10% of the base hourly for the same eight hours. Charging the base
-// hour again inside the night premium pays those hours twice.
+// What does NOT change is that the base hour is never charged here: the
+// imported row reading regHRS 8 / regPay 611.93 carries regNP 8 / regNPPay
+// 61.19 — 10% of the hourly for those same eight hours, not 110% of it. Paying
+// the base hour again inside the night premium pays those hours twice.
 
 // What a day type still owes when nobody worked it, and which of the two leave
 // allowances applies. Rates deliberately live in RATE_MULTIPLIERS, not here.

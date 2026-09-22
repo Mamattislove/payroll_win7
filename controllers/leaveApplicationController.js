@@ -1,17 +1,48 @@
 import { StatusCodes } from "http-status-codes";
 import LeaveApplication from "../models/LeaveApplication.js";
+import EmployeeDesignation from "../models/EmployeeDesignation.js";
 import { NotFoundError } from "../errors/customErrors.js";
 import { LEAVE_STATUS } from "../utils/constants.js";
 
 const SORTABLE_FIELDS = ["dateFrom", "dateTo"];
 
+// Range filters arrive as plain "YYYY-MM-DD". Pin them to UTC day bounds so
+// both ends of the range stay inclusive.
+const utcDayStart = (d) => new Date(`${String(d).slice(0, 10)}T00:00:00.000Z`);
+const utcDayEnd = (d) => new Date(`${String(d).slice(0, 10)}T23:59:59.999Z`);
+
+// A leave belongs to a client through the employee's designation; the leave
+// record itself carries no client. More than one designation can point at the
+// same employee, so the ids are de-duplicated.
+const employeeIdsForClient = async (client) => {
+    const designations = await EmployeeDesignation.find({ client }).select(
+        "employee",
+    );
+    return [...new Set(designations.map((d) => String(d.employee)))];
+};
+
 export const getAllLeaveApplications = async (req, res) => {
-    const { page = 1, limit = 10, employee, status, sort = "-dateFrom" } = req.query;
+    const {
+        page = 1,
+        limit = 10,
+        employee,
+        status,
+        client,
+        from,
+        to,
+        sort = "-dateFrom",
+    } = req.query;
     const pageNum = Math.max(1, Number(page));
     const limitNum = Math.max(1, Number(limit));
     const query = {};
     if (employee) query.employee = employee;
     if (status) query.status = status;
+    if (client && !employee)
+        query.employee = { $in: await employeeIdsForClient(client) };
+    // Overlap, not containment: a leave that starts before the range and ends
+    // inside it was still taken during the period being reported on.
+    if (from) query.dateTo = { $gte: utcDayStart(from) };
+    if (to) query.dateFrom = { $lte: utcDayEnd(to) };
 
     const sortDesc = sort.startsWith("-");
     const sortField = sortDesc ? sort.slice(1) : sort;

@@ -196,6 +196,18 @@ const router = createBrowserRouter([
                 lazy: page(() => import("./pages/NetPayReport")),
             },
             {
+                path: "savings-report",
+                lazy: page(() => import("./pages/SavingsReport")),
+            },
+            {
+                path: "loans-report",
+                lazy: page(() => import("./pages/LoansReport")),
+            },
+            {
+                path: "leaves-report",
+                lazy: page(() => import("./pages/LeavesReport")),
+            },
+            {
                 path: "users",
                 lazy: page(() => import("./pages/Users")),
             },

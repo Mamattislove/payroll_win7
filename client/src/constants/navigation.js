@@ -73,6 +73,21 @@ export const navGroups = [
                 icon: MdReceipt,
                 label: "Net Pay Report",
             },
+            {
+                to: "/dashboard/savings-report",
+                icon: MdReceipt,
+                label: "Savings Report",
+            },
+            {
+                to: "/dashboard/loans-report",
+                icon: MdReceipt,
+                label: "Loans Report",
+            },
+            {
+                to: "/dashboard/leaves-report",
+                icon: MdReceipt,
+                label: "Leaves Report",
+            },
         ],
     },
     {

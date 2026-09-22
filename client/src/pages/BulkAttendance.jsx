@@ -107,20 +107,12 @@ const blankRow = (date, holidayMap = {}, leaveMap = {}) => {
     };
 };
 
-const numberOrUndefined = (val) =>
-    val === "" || val === null || val === undefined ? undefined : Number(val);
-
 // Late and undertime are both stored as HOURS, because pay is computed per hour
 // (lateHr * perHour in computeAttendance). Undertime is also entered in hours,
 // so it passes straight through. Late is entered in minutes -- the unit a
 // timesheet reports it in -- and converts at the two API boundaries, so typing
 // 30 must never reach the server as 30 hours.
 const MINUTES_PER_HOUR = 60;
-
-const minutesToHours = (minutes) => {
-    const n = numberOrUndefined(minutes);
-    return n === undefined ? undefined : n / MINUTES_PER_HOUR;
-};
 
 // Rounded, because minutes are the unit a clerk works in: 0.0833 hours is
 // 5 minutes, and showing 5.0 is what they expect to see and re-enter.
@@ -131,9 +123,8 @@ const hoursToMinutes = (hours) =>
 
 // Quick-fill presets for common shift patterns — values are configurable
 // from the top of the page and applied per-row via the Shortcut buttons.
-// Night hours are the slice of the hours worked that fell after 10pm, not hours
-// on top of them: a graveyard shift is 8 regular hours of which 8 were at
-// night, not 4 plus 4. Keying it as 4 + 4 pays the employee half a day.
+// The four fields map to the grid's Reg / OT / ND / OT-ND columns; what each
+// one is worth is computeAttendance's business, not this table's.
 const DEFAULT_PRESETS = {
     day: {
         regularHours: 8,
@@ -847,16 +838,56 @@ const SummaryModal = ({
 
 // ─── rows editor (keyed by date range so it remounts fresh on change) ──────────
 
+// A blank cell means zero, and it has to travel as an explicit 0: PATCH
+// /attendances falls back to the stored value for every field the body omits
+// (req.body.x ?? existing.x), and axios drops undefined keys from the JSON, so
+// a cleared box or a Reset would look applied on screen and never persist.
+const numberOrZero = (val) =>
+    val === "" || val === null || val === undefined ? 0 : Number(val);
+
+// Reads back what the server holds for this range, keyed by date. A row that
+// does not learn its existingId here is posted as new on save and the server
+// skips the date as a duplicate, so the typed values are silently dropped.
+const fetchExistingByDate = async (compensation, dateFrom, dateTo) => {
+    const { data } = await customFetch.get(
+        `/attendances?compensation=${compensation}&dateFrom=${dateFrom}&dateTo=${dateTo}&limit=500`,
+    );
+    const map = {};
+    for (const att of data.attendances || []) {
+        const key = new Date(att.attendanceDate).toISOString().slice(0, 10);
+        map[key] = att;
+    }
+    return map;
+};
+
+const mergeExisting = (rows, map) =>
+    rows.map((row) => {
+        const existing = map[row.attendanceDate];
+        if (!existing) return row;
+        return {
+            ...row,
+            existingId: existing._id,
+            dayType: existing.dayType || row.dayType,
+            regularHours: existing.regularHours ?? "",
+            overtimeHours: existing.overtimeHours ?? "",
+            nightPremiumHours: existing.nightPremiumHours ?? "",
+            overtimeNightPremiumHours: existing.overtimeNightPremiumHours ?? "",
+            lateMin: hoursToMinutes(existing.lateHr),
+            undertimeHr: existing.undertimeHr ?? "",
+            remarks: existing.remarks || row.remarks,
+        };
+    });
+
 const toRecord = (r) => ({
     attendanceDate: r.attendanceDate,
     dayType: r.dayType || undefined,
-    regularHours: numberOrUndefined(r.regularHours),
-    overtimeHours: numberOrUndefined(r.overtimeHours),
-    nightPremiumHours: numberOrUndefined(r.nightPremiumHours),
-    overtimeNightPremiumHours: numberOrUndefined(r.overtimeNightPremiumHours),
-    lateHr: minutesToHours(r.lateMin),
-    undertimeHr: numberOrUndefined(r.undertimeHr),
-    remarks: r.remarks || undefined,
+    regularHours: numberOrZero(r.regularHours),
+    overtimeHours: numberOrZero(r.overtimeHours),
+    nightPremiumHours: numberOrZero(r.nightPremiumHours),
+    overtimeNightPremiumHours: numberOrZero(r.overtimeNightPremiumHours),
+    lateHr: numberOrZero(r.lateMin) / MINUTES_PER_HOUR,
+    undertimeHr: numberOrZero(r.undertimeHr),
+    remarks: r.remarks ?? "",
 });
 
 const RowsEditor = ({
@@ -876,43 +907,19 @@ const RowsEditor = ({
     const [saving, setSaving] = useState(false);
     const [showSummary, setShowSummary] = useState(false);
 
-    // On mount, fetch existing attendance records for this range and pre-fill matching rows.
+    // On mount, pre-fill the rows that already have a saved record. A failure is
+    // shown rather than swallowed: without the ids every row looks new, and the
+    // next save silently loses the dates the server rejects as duplicates.
     useEffect(() => {
         if (!compensation) return;
-        customFetch
-            .get(
-                `/attendances?compensation=${compensation}&dateFrom=${dateFrom}&dateTo=${dateTo}&limit=500`,
-            )
-            .then(({ data }) => {
-                const map = {};
-                for (const att of data.attendances || []) {
-                    const key = new Date(att.attendanceDate)
-                        .toISOString()
-                        .slice(0, 10);
-                    map[key] = att;
-                }
-                setRows((prev) =>
-                    prev.map((row) => {
-                        const existing = map[row.attendanceDate];
-                        if (!existing) return row;
-                        return {
-                            ...row,
-                            existingId: existing._id,
-                            dayType: existing.dayType || row.dayType,
-                            regularHours: existing.regularHours ?? "",
-                            overtimeHours: existing.overtimeHours ?? "",
-                            nightPremiumHours: existing.nightPremiumHours ?? "",
-                            overtimeNightPremiumHours:
-                                existing.overtimeNightPremiumHours ?? "",
-                            lateMin: hoursToMinutes(existing.lateHr),
-                            undertimeHr: existing.undertimeHr ?? "",
-                            remarks: existing.remarks || row.remarks,
-                        };
-                    }),
-                );
-            })
-            .catch(() => {});
-    }, []);
+        fetchExistingByDate(compensation, dateFrom, dateTo)
+            .then((map) => setRows((prev) => mergeExisting(prev, map)))
+            .catch(() =>
+                toast.error(
+                    "Could not load existing attendance for this range - saving may report dates as skipped.",
+                ),
+            );
+    }, [compensation, dateFrom, dateTo]);
 
     const updateRow = (index, field, value) => {
         setRows((prev) =>
@@ -960,6 +967,7 @@ const RowsEditor = ({
 
             let createdCount = 0;
             let updatedCount = 0;
+            let skipped = [];
 
             if (newRows.length > 0) {
                 const { data } = await customFetch.post("/attendances/bulk", {
@@ -967,6 +975,7 @@ const RowsEditor = ({
                     records: newRows.map(toRecord),
                 });
                 createdCount = data.createdCount;
+                skipped = data.skipped || [];
             }
 
             if (existingRows.length > 0) {
@@ -984,8 +993,27 @@ const RowsEditor = ({
             const parts = [];
             if (createdCount > 0) parts.push(`Created ${createdCount}`);
             if (updatedCount > 0) parts.push(`Updated ${updatedCount}`);
-            toast.success(parts.join(", ") + " record(s)");
-            setRows([]);
+            if (parts.length > 0)
+                toast.success(parts.join(", ") + " record(s)");
+
+            // Dates the server refused to create because a record already
+            // existed. Their typed values were dropped, so say so rather than
+            // let the re-sync below quietly replace them.
+            if (skipped.length > 0)
+                toast.error(
+                    `${skipped.length} date(s) already had a record and were not created - the stored values are shown, edit and save again.`,
+                );
+
+            // The grid stays on screen and editable: a save is a checkpoint, not
+            // the end of the session. Reading the range back hands every row just
+            // created its new id, so the next save updates it instead of
+            // re-posting a date the server would skip.
+            const saved = await fetchExistingByDate(
+                compensation,
+                dateFrom,
+                dateTo,
+            ).catch(() => null);
+            if (saved) setRows((prev) => mergeExisting(prev, saved));
         } catch (error) {
             toast.error(
                 error?.response?.data?.msg ||
@@ -1000,7 +1028,7 @@ const RowsEditor = ({
     if (rows.length === 0) {
         return (
             <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-400 text-sm">
-                All rows submitted or removed.
+                All rows removed. Pick a different date range to start over.
             </div>
         );
     }
@@ -1588,7 +1616,7 @@ const RowsEditor = ({
                                     sum + (Number(row.regularHours) || 0),
                                 0,
                             ) / 8
-                        ).toFixed(2)}
+                        ).toFixed(3)}
                     </span>
                 </p>
                 <p className="text-sm text-slate-600">
