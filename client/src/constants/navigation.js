@@ -88,6 +88,11 @@ export const navGroups = [
                 icon: MdReceipt,
                 label: "Leaves Report",
             },
+            {
+                to: "/dashboard/gov-contributions",
+                icon: MdReceipt,
+                label: "Gov't Contributions",
+            },
         ],
     },
     {

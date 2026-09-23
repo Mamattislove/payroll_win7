@@ -18,6 +18,14 @@ const loanApplicationSchema = new mongoose.Schema(
         },
         loanName: { type: String },
         checkNumber: String,
+        // Written by seeders/importCuratedYnlOldLoans.js through the raw driver
+        // because they were not on the schema. Declared now because strict mode
+        // silently drops undeclared paths when a document is hydrated -- the
+        // loans report groups by sourceAgency, and would have seen undefined on
+        // any read that was not .lean(). Declaring them changes no stored data.
+        legacyAppNumber: { type: String },
+        sourceSheet: { type: String },
+        sourceAgency: { type: String },
         dateGranted: Date,
         loanAmount: Number,
         loanPayable: { type: Number },

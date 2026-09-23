@@ -21,6 +21,7 @@ export const getAllAttendances = async (req, res) => {
         search,
         compensation,
         client,
+        department,
         dayType,
         dateFrom,
         dateTo,
@@ -54,8 +55,12 @@ export const getAllAttendances = async (req, res) => {
 
         compensationIdSets.push(compensations.map((c) => String(c._id)));
     }
-    if (client) {
-        const designations = await EmployeeDesignation.find({ client }).select("_id");
+    if (client || department) {
+        const designationFilter = {};
+        if (client) designationFilter.client = client;
+        if (department) designationFilter.department = department;
+        const designations =
+            await EmployeeDesignation.find(designationFilter).select("_id");
         const compIds = await Compensation.find({
             employeeDesignation: { $in: designations.map((d) => d._id) },
         }).select("_id");

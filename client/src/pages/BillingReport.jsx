@@ -4,7 +4,7 @@ import { FiDownload } from "react-icons/fi";
 import { Document, Page, View, Text, Image, StyleSheet, pdf } from "@react-pdf/renderer";
 import customFetch from "../../utils/customFetch";
 import { DAY_TYPES, EMPLOYMENT_STATUS } from "../../../utils/constants";
-import { ClientCombobox } from "../components";
+import { ClientCombobox, DepartmentSelect } from "../components";
 import logo from "../assets/ynl.png";
 
 export const loader = async () => {
@@ -174,7 +174,7 @@ const GROUPS = [
 ];
 
 const BillingReportPDF = ({ report }) => {
-    const { rows, clientName, dateFrom, dateTo } = report;
+    const { rows, clientName, departmentName, dateFrom, dateTo } = report;
     const grandTotal = rows.reduce((s, r) => s + r.total, 0);
     const P = C.pair;
 
@@ -190,7 +190,7 @@ const BillingReportPDF = ({ report }) => {
                     <Text style={S.rptDate}>Date Covered: {fmtDate(dateFrom)} – {fmtDate(dateTo)}</Text>
                 </View>
                 <View style={S.meta}>
-                    <Text>CLIENT: <Text style={S.metaBold}>{clientName}</Text></Text>
+                    <Text>CLIENT: <Text style={S.metaBold}>{clientName}</Text>{"   "}DEPARTMENT: <Text style={S.metaBold}>{departmentName || "ALL"}</Text></Text>
                 </View>
 
                 {/* Table header */}
@@ -373,7 +373,13 @@ const UnbilledNotice = ({ unbilled = [] }) => {
 
 const BillingReport = () => {
     const { clients } = useLoaderData();
-    const [filter, setFilter] = useState({ clientId: "", dateFrom: "", dateTo: "" });
+    const [filter, setFilter] = useState({
+        clientId: "",
+        departmentId: "",
+        departmentName: "",
+        dateFrom: "",
+        dateTo: "",
+    });
     const [report, setReport] = useState(null);
     const [loading, setLoading] = useState(false);
     const [pdfLoading, setPdfLoading] = useState(false);
@@ -394,6 +400,8 @@ const BillingReport = () => {
                 limit: 10000,
                 employeeStatus: EMPLOYMENT_STATUS.ACTIVE,
             });
+            if (filter.departmentId)
+                params.set("department", filter.departmentId);
             // The bill is built from attendance, so an employee with no
             // timekeeping simply does not appear on it. Pull the payrolls for
             // the same window too: anyone paid for this period but missing from
@@ -406,6 +414,11 @@ const BillingReport = () => {
                 limit: 10000,
                 employeeStatus: EMPLOYMENT_STATUS.ACTIVE,
             });
+            // Narrowed alongside the attendance above: comparing one
+            // department's attendance against the whole client's payroll would
+            // report every other department as unbilled labour.
+            if (filter.departmentId)
+                payrollParams.set("department", filter.departmentId);
             const [{ data }, { data: payrollData }] = await Promise.all([
                 customFetch.get(`/attendances?${params}`),
                 customFetch.get(`/payrolls?${payrollParams}`),
@@ -432,7 +445,14 @@ const BillingReport = () => {
                 .sort((a, b) => b.amount - a.amount);
 
             const clientName = clients.find((c) => c._id === filter.clientId)?.clientName ?? "";
-            setReport({ rows, unbilled, clientName, dateFrom: filter.dateFrom, dateTo: filter.dateTo });
+            setReport({
+                rows,
+                unbilled,
+                clientName,
+                departmentName: filter.departmentName,
+                dateFrom: filter.dateFrom,
+                dateTo: filter.dateTo,
+            });
         } catch {
             setError("Failed to load attendance data. Please try again.");
         } finally {
@@ -473,7 +493,29 @@ const BillingReport = () => {
                         <ClientCombobox
                             clients={clients}
                             value={filter.clientId}
-                            onChange={(id) => setFilter((p) => ({ ...p, clientId: id }))}
+                            onChange={(id) =>
+                                setFilter((p) => ({
+                                    ...p,
+                                    clientId: id,
+                                    departmentId: "",
+                                    departmentName: "",
+                                }))
+                            }
+                        />
+                    </div>
+                    <div>
+                        <label className={labelCls}>Department</label>
+                        <DepartmentSelect
+                            clientId={filter.clientId}
+                            value={filter.departmentId}
+                            onChange={(id, name) =>
+                                setFilter((p) => ({
+                                    ...p,
+                                    departmentId: id,
+                                    departmentName: name,
+                                }))
+                            }
+                            className={`${inputCls} disabled:opacity-60`}
                         />
                     </div>
                     <div>
@@ -532,7 +574,13 @@ const BillingReport = () => {
                             Date Covered: {fmtDate(report.dateFrom)} – {fmtDate(report.dateTo)}
                         </p>
                     </div>
-                    <p className="text-xs mb-3">CLIENT: <strong>{report.clientName}</strong></p>
+                    <p className="text-xs mb-3">
+                        CLIENT: <strong>{report.clientName}</strong>
+                        <span className="ml-6">
+                            DEPARTMENT:{" "}
+                            <strong>{report.departmentName || "ALL"}</strong>
+                        </span>
+                    </p>
 
                     <UnbilledNotice unbilled={report.unbilled} />
 

@@ -38,7 +38,13 @@ const compensationPopulate = {
     populate: {
         path: "employeeDesignation",
         populate: [
-            { path: "employee", select: "firstName lastName employeeCode" },
+            {
+                path: "employee",
+                // The agency numbers ride along for the government
+                // contributions report -- a remittance list is no use to SSS
+                // or PhilHealth without the member number beside the amount.
+                select: "firstName lastName employeeCode sssNumber philhealthNumber pagibigNumber",
+            },
             { path: "client", select: "clientName" },
             { path: "department", select: "departmentName" },
             { path: "position", select: "positionName" },
@@ -430,7 +436,10 @@ export const getAllPayrolls = async (req, res) => {
             select: "loan amount dateOfPayment",
             populate: {
                 path: "loan",
-                select: "loanName loanType loanPayable monthlyAmortization loanStatus",
+                // sourceAgency comes from the legacy import and is the
+                // authoritative SSS/Pag-IBIG split for those loans; the loans
+                // report falls back to the loan type name without it.
+                select: "loanName loanType loanPayable monthlyAmortization loanStatus sourceAgency checkNumber legacyAppNumber",
                 populate: { path: "loanType", select: "loanTypeName" },
             },
         })

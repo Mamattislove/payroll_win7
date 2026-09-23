@@ -25,6 +25,40 @@ export const loader = async () => {
     }
 };
 
+// ─── the three agencies ───────────────────────────────────────────────────────
+
+// Everything that differs between the tabs lives here, so the table, the PDF
+// and the totals are written once. Adding a fourth agency is a new entry.
+const AGENCIES = [
+    {
+        key: "sss",
+        label: "SSS",
+        title: "SSS CONTRIBUTIONS REPORT",
+        numberField: "sssNumber",
+        numberLabel: "SSS No.",
+        employeeField: "sssContribution",
+        employerField: "sssEmployerContribution",
+    },
+    {
+        key: "philhealth",
+        label: "PhilHealth",
+        title: "PHILHEALTH CONTRIBUTIONS REPORT",
+        numberField: "philhealthNumber",
+        numberLabel: "PhilHealth No.",
+        employeeField: "philhealthContribution",
+        employerField: "philhealthEmployerContribution",
+    },
+    {
+        key: "pagibig",
+        label: "Pag-IBIG",
+        title: "PAG-IBIG CONTRIBUTIONS REPORT",
+        numberField: "pagibigNumber",
+        numberLabel: "Pag-IBIG No.",
+        employeeField: "pagibigContribution",
+        employerField: "pagibigEmployerContribution",
+    },
+];
+
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 // "Aug. 16, 2026" — the form the printed reports use, which en-PH's short
@@ -70,93 +104,52 @@ const cutoffDateTo = (fromVal) => {
     return null;
 };
 
-// The three remittance groups. SSS and Pag-IBIG are each reported and paid to
-// their own agency, so they are counted apart; everything else is company or
-// third-party lending and totals on its own.
-const LOAN_GROUPS = [
-    { key: "sss", label: "SSS", title: "SSS LOANS REPORT" },
-    { key: "pagibig", label: "Pag-IBIG", title: "PAG-IBIG LOANS REPORT" },
-    { key: "other", label: "Other", title: "OTHER LOANS REPORT" },
-];
-
 /**
- * Which group a loan belongs to.
+ * Rows for one agency. Built for all three from a single fetch, so switching
+ * tabs is instant and the three tabs can never disagree about a period.
  *
- * `sourceAgency` is recorded on loans brought over from the legacy system and
- * is the classification someone already made by hand, so it wins. Without one,
- * the loan type name decides: the agency-specific types are all prefixed, and
- * the generic ones ("Salary Loan", "Personal Loan") are exactly the cases where
- * the source data never said which agency — those belong in Other rather than
- * being guessed into a remittance list.
+ * An employee with a zero contribution is dropped: a remittance list is who
+ * owes something this cutoff, and "no deduction" employees would otherwise pad
+ * every page with zero rows.
  */
-const loanGroup = (loan) => {
-    const agency = String(loan?.sourceAgency || "").toUpperCase();
-    if (agency.startsWith("SSS")) return "sss";
-    if (agency.startsWith("PAG")) return "pagibig";
-
-    const name = String(loan?.loanType?.loanTypeName || "").toUpperCase();
-    if (name.startsWith("SSS")) return "sss";
-    if (
-        name.startsWith("PAG-IBIG") ||
-        name.startsWith("PAG IBIG") ||
-        name.startsWith("HDMF")
-    )
-        return "pagibig";
-    return "other";
-};
-
-// One line per loan payment. Two loans running at once for the same employee
-// stay on separate lines now that each carries its own reference number -- that
-// number is what the agency reconciles against, so summing them would lose it.
-//
-// The check number is preferred and the application number backs it up: the
-// check is recorded on about half the loans, the application number on nearly
-// all of them.
-const loanRef = (loan) => loan?.checkNumber || loan?.legacyAppNumber || "—";
-
-function buildRows(payrolls, groupKey) {
-    const rows = [];
-    for (const p of payrolls) {
-        const emp = p.compensation?.employeeDesignation?.employee;
-        for (const lp of p.loans || []) {
-            if (!(lp.amount > 0)) continue;
-            if (groupKey && loanGroup(lp.loan) !== groupKey) continue;
-            rows.push({
+function buildRows(payrolls, agency) {
+    const rows = payrolls
+        .map((p) => {
+            const emp = p.compensation?.employeeDesignation?.employee;
+            return {
                 code: emp?.employeeCode || "—",
                 name: emp ? `${emp.lastName}, ${emp.firstName}` : "—",
-                // Imported legacy loans carry no loanName, so the type is
-                // the only label they have; a named company loan shows its own.
-                type:
-                    lp.loan?.loanType?.loanTypeName ||
-                    lp.loan?.loanName ||
-                    "—",
-                ref: loanRef(lp.loan),
+                number: emp?.[agency.numberField] || "—",
                 period: fmtPeriod(p.payrollFrom, p.payrollTo),
                 periodKey: String(p.payrollFrom ?? ""),
-                deduction: lp.amount || 0,
-            });
-        }
-    }
-    rows.sort(
-        (a, b) =>
-            a.name.localeCompare(b.name) ||
-            a.periodKey.localeCompare(b.periodKey) ||
-            a.type.localeCompare(b.type) ||
-            String(a.ref).localeCompare(String(b.ref)),
-    );
+                employee: p[agency.employeeField] || 0,
+                employer: p[agency.employerField] || 0,
+            };
+        })
+        .filter((r) => r.employee > 0 || r.employer > 0)
+        .sort(
+            (a, b) =>
+                a.name.localeCompare(b.name) ||
+                a.periodKey.localeCompare(b.periodKey),
+        );
 
-    // A single cutoff prints like the paper report. A wider range returns
-    // several periods per employee, which without the period column land as
-    // indistinguishable repeated names.
     const showPeriod = new Set(rows.map((r) => r.periodKey)).size > 1;
     return { rows, showPeriod };
 }
 
-const sumRows = (rows) => rows.reduce((s, r) => s + r.deduction, 0);
+const totalsOf = (rows) =>
+    rows.reduce(
+        (t, r) => ({
+            employee: t.employee + r.employee,
+            employer: t.employer + r.employer,
+            total: t.total + r.employee + r.employer,
+        }),
+        { employee: 0, employer: 0, total: 0 },
+    );
 
 // ─── PDF ──────────────────────────────────────────────────────────────────────
 
-const W = { num: 22, code: 52, type: 92, ref: 100, period: 70, amount: 78 };
+const W = { num: 24, code: 54, agencyNo: 92, period: 74, amt: 70 };
 
 const S = StyleSheet.create({
     page: {
@@ -214,8 +207,9 @@ const S = StyleSheet.create({
     empty: { fontSize: 8, color: "#64748b", textAlign: "center", padding: 14 },
 });
 
-const LoansPDF = ({ report, group }) => {
-    const { rows, showPeriod } = buildRows(report.payrolls, group.key);
+const GovPDF = ({ report, agency }) => {
+    const { rows, showPeriod } = buildRows(report.payrolls, agency);
+    const t = totalsOf(rows);
     const { clientName, departmentName, dateFrom, dateTo } = report;
 
     return (
@@ -230,7 +224,7 @@ const LoansPDF = ({ report, group }) => {
                         Lot 3 Unit 3 Arcadia Residence Borol 1st Balagtas,
                         Bulacan
                     </Text>
-                    <Text style={S.rptTitle}>{group.title}</Text>
+                    <Text style={S.rptTitle}>{agency.title}</Text>
                     <Text style={S.rptDate}>
                         Date Covered: {fmtCovered(dateFrom)} -{" "}
                         {fmtCovered(dateTo)}
@@ -259,25 +253,28 @@ const LoansPDF = ({ report, group }) => {
                     <View style={[S.th, { flex: 1 }]}>
                         <Text style={S.thText}>Employee Name</Text>
                     </View>
-                    <View style={[S.th, { width: W.type }]}>
-                        <Text style={S.thText}>Loan Type</Text>
-                    </View>
-                    <View style={[S.th, { width: W.ref }]}>
-                        <Text style={S.thText}>Check / App No.</Text>
+                    <View style={[S.th, { width: W.agencyNo }]}>
+                        <Text style={S.thText}>{agency.numberLabel}</Text>
                     </View>
                     {showPeriod && (
                         <View style={[S.th, { width: W.period }]}>
                             <Text style={S.thText}>Period</Text>
                         </View>
                     )}
-                    <View style={[S.th, { width: W.amount }]}>
-                        <Text style={S.thText}>Deduction</Text>
+                    <View style={[S.th, { width: W.amt }]}>
+                        <Text style={S.thText}>Employee</Text>
+                    </View>
+                    <View style={[S.th, { width: W.amt }]}>
+                        <Text style={S.thText}>Employer</Text>
+                    </View>
+                    <View style={[S.th, { width: W.amt }]}>
+                        <Text style={S.thText}>Total</Text>
                     </View>
                 </View>
 
                 {rows.length === 0 ? (
                     <Text style={S.empty}>
-                        No {group.label} loan deductions for this client and
+                        No {agency.label} contributions for this client and
                         period.
                     </Text>
                 ) : (
@@ -294,11 +291,8 @@ const LoansPDF = ({ report, group }) => {
                                 <View style={[S.td, bg, { flex: 1 }]}>
                                     <Text style={S.tdL}>{row.name}</Text>
                                 </View>
-                                <View style={[S.td, bg, { width: W.type }]}>
-                                    <Text style={S.tdL}>{row.type}</Text>
-                                </View>
-                                <View style={[S.td, bg, { width: W.ref }]}>
-                                    <Text style={S.tdL}>{row.ref}</Text>
+                                <View style={[S.td, bg, { width: W.agencyNo }]}>
+                                    <Text style={S.tdL}>{row.number}</Text>
                                 </View>
                                 {showPeriod && (
                                     <View
@@ -307,9 +301,19 @@ const LoansPDF = ({ report, group }) => {
                                         <Text style={S.tdC}>{row.period}</Text>
                                     </View>
                                 )}
-                                <View style={[S.td, bg, { width: W.amount }]}>
+                                <View style={[S.td, bg, { width: W.amt }]}>
                                     <Text style={S.tdR}>
-                                        {f2(row.deduction)}
+                                        {f2(row.employee)}
+                                    </Text>
+                                </View>
+                                <View style={[S.td, bg, { width: W.amt }]}>
+                                    <Text style={S.tdR}>
+                                        {f2(row.employer)}
+                                    </Text>
+                                </View>
+                                <View style={[S.td, bg, { width: W.amt }]}>
+                                    <Text style={S.tdR}>
+                                        {f2(row.employee + row.employer)}
                                     </Text>
                                 </View>
                             </View>
@@ -328,10 +332,7 @@ const LoansPDF = ({ report, group }) => {
                         <View style={[S.td, S.gt, { flex: 1 }]}>
                             <Text style={S.gtLabel}> </Text>
                         </View>
-                        <View style={[S.td, S.gt, { width: W.type }]}>
-                            <Text style={S.gtLabel}> </Text>
-                        </View>
-                        <View style={[S.td, S.gt, { width: W.ref }]}>
+                        <View style={[S.td, S.gt, { width: W.agencyNo }]}>
                             <Text style={S.gtLabel}> </Text>
                         </View>
                         {showPeriod && (
@@ -339,8 +340,14 @@ const LoansPDF = ({ report, group }) => {
                                 <Text style={S.gtLabel}> </Text>
                             </View>
                         )}
-                        <View style={[S.td, S.gt, { width: W.amount }]}>
-                            <Text style={S.gtAmt}>{f2(sumRows(rows))}</Text>
+                        <View style={[S.td, S.gt, { width: W.amt }]}>
+                            <Text style={S.gtAmt}>{f2(t.employee)}</Text>
+                        </View>
+                        <View style={[S.td, S.gt, { width: W.amt }]}>
+                            <Text style={S.gtAmt}>{f2(t.employer)}</Text>
+                        </View>
+                        <View style={[S.td, S.gt, { width: W.amt }]}>
+                            <Text style={S.gtAmt}>{f2(t.total)}</Text>
                         </View>
                     </View>
                 )}
@@ -361,7 +368,7 @@ const Th = ({ children, right }) => (
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
-const LoansReport = () => {
+const GovContributionsReport = () => {
     const { clients } = useLoaderData();
     const [filter, setFilter] = useState({
         clientId: "",
@@ -371,10 +378,12 @@ const LoansReport = () => {
         dateTo: "",
     });
     const [report, setReport] = useState(null);
-    const [tab, setTab] = useState(LOAN_GROUPS[0].key);
+    const [tab, setTab] = useState(AGENCIES[0].key);
     const [loading, setLoading] = useState(false);
     const [pdfLoading, setPdfLoading] = useState(false);
     const [error, setError] = useState("");
+
+    const agency = AGENCIES.find((a) => a.key === tab) ?? AGENCIES[0];
 
     const generate = async (e) => {
         e.preventDefault();
@@ -395,8 +404,9 @@ const LoansReport = () => {
             if (filter.departmentId)
                 params.set("department", filter.departmentId);
             const { data } = await customFetch.get(`/payrolls?${params}`);
-            // The payrolls are kept whole so all three tabs read one fetch
-            // and cannot drift apart; each tab classifies for itself.
+            // The payrolls are kept whole rather than pre-shaped per agency:
+            // all three tabs read the same fetch, so they cannot drift apart
+            // and switching tabs costs nothing.
             setReport({
                 payrolls: data.payrolls || [],
                 clientName:
@@ -418,12 +428,12 @@ const LoansReport = () => {
         setPdfLoading(true);
         try {
             const blob = await pdf(
-                <LoansPDF report={report} group={group} />,
+                <GovPDF report={report} agency={agency} />,
             ).toBlob();
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = `${group.key}-loans-${report.dateFrom}-to-${report.dateTo}.pdf`;
+            a.download = `${agency.key}-contributions-${report.dateFrom}-to-${report.dateTo}.pdf`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -439,19 +449,18 @@ const LoansReport = () => {
         "rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-100";
     const labelCls =
         "block text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1.5";
-    const group = LOAN_GROUPS.find((g) => g.key === tab) ?? LOAN_GROUPS[0];
+
     const { rows, showPeriod } = report
-        ? buildRows(report.payrolls, group.key)
+        ? buildRows(report.payrolls, agency)
         : { rows: [], showPeriod: false };
-    const total = sumRows(rows);
-    // # + Code + Name + Type + Ref (+ Period); Deduction sits beside them.
-    const colSpan = showPeriod ? 7 : 6;
+    const t = totalsOf(rows);
+    const colSpan = showPeriod ? 8 : 7;
 
     return (
         <>
             <div className="mb-6">
                 <h1 className="text-2xl font-bold text-slate-800 mb-4">
-                    Loans Report
+                    Government Contributions
                 </h1>
                 <form
                     onSubmit={generate}
@@ -537,7 +546,7 @@ const LoansReport = () => {
                             <FiDownload className="text-base" />
                             {pdfLoading
                                 ? "Building PDF…"
-                                : `Download ${group.label} PDF`}
+                                : `Download ${agency.label} PDF`}
                         </button>
                     )}
                 </form>
@@ -546,26 +555,28 @@ const LoansReport = () => {
 
             {report && (
                 <div className="bg-white border border-slate-200 rounded-xl shadow-sm">
+                    {/* Tabs. Each carries its own total so the three agencies
+                        can be compared without switching back and forth. */}
                     <div className="flex border-b border-slate-200 px-2">
-                        {LOAN_GROUPS.map((g) => {
-                            const active = g.key === tab;
-                            const gTotal = sumRows(
-                                buildRows(report.payrolls, g.key).rows,
+                        {AGENCIES.map((a) => {
+                            const active = a.key === tab;
+                            const at = totalsOf(
+                                buildRows(report.payrolls, a).rows,
                             );
                             return (
                                 <button
-                                    key={g.key}
+                                    key={a.key}
                                     type="button"
-                                    onClick={() => setTab(g.key)}
+                                    onClick={() => setTab(a.key)}
                                     className={`px-4 py-3 text-sm font-semibold border-b-2 -mb-px transition-colors ${
                                         active
                                             ? "border-slate-800 text-slate-800"
                                             : "border-transparent text-slate-400 hover:text-slate-600"
                                     }`}
                                 >
-                                    {g.label}
+                                    {a.label}
                                     <span className="ml-2 text-[11px] font-medium text-slate-400">
-                                        ₱{f2(gTotal)}
+                                        ₱{f2(at.total)}
                                     </span>
                                 </button>
                             );
@@ -573,116 +584,132 @@ const LoansReport = () => {
                     </div>
 
                     <div className="p-6">
-                    <div className="text-center mb-4 pb-4 border-b border-slate-200">
-                        <p
-                            className="font-bold text-sm uppercase tracking-widest"
-                            style={{ fontFamily: "Georgia, serif" }}
-                        >
-                            Yaman ng Lahi Labor Service Cooperative
+                        <div className="text-center mb-4 pb-4 border-b border-slate-200">
+                            <p
+                                className="font-bold text-sm uppercase tracking-widest"
+                                style={{ fontFamily: "Georgia, serif" }}
+                            >
+                                Yaman ng Lahi Labor Service Cooperative
+                            </p>
+                            <p className="text-xs text-slate-500 mt-1">
+                                Lot 3 Unit 3 Arcadia Residence Borol 1st
+                                Balagtas, Bulacan
+                            </p>
+                            <p className="font-bold text-sm mt-2">
+                                {agency.title}
+                            </p>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                                Date Covered: {fmtCovered(report.dateFrom)} -{" "}
+                                {fmtCovered(report.dateTo)}
+                            </p>
+                        </div>
+                        <p className="text-xs mb-3">
+                            CLIENT: <strong>{report.clientName}</strong>
+                            <span className="ml-6">
+                                DEPARTMENT:{" "}
+                                <strong>
+                                    {report.departmentName || "ALL"}
+                                </strong>
+                            </span>
                         </p>
-                        <p className="text-xs text-slate-500 mt-1">
-                            Lot 3 Unit 3 Arcadia Residence Borol 1st Balagtas,
-                            Bulacan
-                        </p>
-                        <p className="font-bold text-sm mt-2">
-                            {group.title}
-                        </p>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                            Date Covered: {fmtCovered(report.dateFrom)} -{" "}
-                            {fmtCovered(report.dateTo)}
-                        </p>
-                    </div>
-                    <p className="text-xs mb-3">
-                        CLIENT: <strong>{report.clientName}</strong>
-                        <span className="ml-6">
-                            DEPARTMENT:{" "}
-                            <strong>{report.departmentName || "ALL"}</strong>
-                        </span>
-                    </p>
 
-                    <div
-                        className="overflow-x-auto bg-white"
-                        style={{ fontVariantNumeric: "tabular-nums" }}
-                    >
-                        <table className="border-collapse min-w-full">
-                            <thead>
-                                <tr>
-                                    <Th>#</Th>
-                                    <Th>Code</Th>
-                                    <Th>Employee Name</Th>
-                                    <Th>Loan Type</Th>
-                                    <Th>Check / App No.</Th>
-                                    {showPeriod && <Th>Period</Th>}
-                                    <Th right>Deduction</Th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {rows.length === 0 ? (
+                        <div
+                            className="overflow-x-auto bg-white"
+                            style={{ fontVariantNumeric: "tabular-nums" }}
+                        >
+                            <table className="border-collapse min-w-full">
+                                <thead>
                                     <tr>
-                                        <td
-                                            colSpan={colSpan}
-                                            className="text-center py-10 text-slate-400 text-sm"
-                                        >
-                                            No {group.label} loan deductions
-                                            for this client and period.
-                                        </td>
+                                        <Th>#</Th>
+                                        <Th>Code</Th>
+                                        <Th>Employee Name</Th>
+                                        <Th>{agency.numberLabel}</Th>
+                                        {showPeriod && <Th>Period</Th>}
+                                        <Th right>Employee</Th>
+                                        <Th right>Employer</Th>
+                                        <Th right>Total</Th>
                                     </tr>
-                                ) : (
-                                    <>
-                                        {rows.map((row, i) => (
-                                            <tr
-                                                key={i}
-                                                className={
-                                                    i % 2 === 0
-                                                        ? "bg-white"
-                                                        : "bg-slate-50"
-                                                }
-                                            >
-                                                <td className="px-2 py-1 text-center text-[9.5px] border border-slate-200 font-semibold text-slate-400">
-                                                    {i + 1}
-                                                </td>
-                                                <td className="px-2 py-1 text-[9.5px] border border-slate-200 whitespace-nowrap font-mono text-slate-500">
-                                                    {row.code}
-                                                </td>
-                                                <td className="px-2 py-1 text-[10px] font-semibold border border-slate-200 whitespace-nowrap">
-                                                    {row.name}
-                                                </td>
-                                                <td className="px-2 py-1 text-[10px] border border-slate-200 whitespace-nowrap text-slate-600">
-                                                    {row.type}
-                                                </td>
-                                                <td className="px-2 py-1 text-[9.5px] border border-slate-200 whitespace-nowrap font-mono text-slate-500">
-                                                    {row.ref}
-                                                </td>
-                                                {showPeriod && (
-                                                    <td className="px-2 py-1 text-center text-[9.5px] border border-slate-200 whitespace-nowrap text-slate-500">
-                                                        {row.period}
-                                                    </td>
-                                                )}
-                                                <td className="px-2 py-1 text-right text-[10px] border border-slate-200 whitespace-nowrap font-semibold text-slate-800">
-                                                    {f2(row.deduction)}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                        <tr className="bg-slate-800 text-white">
+                                </thead>
+                                <tbody>
+                                    {rows.length === 0 ? (
+                                        <tr>
                                             <td
-                                                colSpan={colSpan - 1}
-                                                className="px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider border border-slate-600"
+                                                colSpan={colSpan}
+                                                className="text-center py-10 text-slate-400 text-sm"
                                             >
-                                                Total
-                                            </td>
-                                            <td className="px-2 py-1.5 text-right text-[10px] font-bold text-white border border-slate-600 whitespace-nowrap">
-                                                {f2(total)}
+                                                No {agency.label} contributions
+                                                for this client and period.
                                             </td>
                                         </tr>
-                                    </>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                    <p className="mt-3 text-xs text-slate-400 text-right">
-                        {rows.length} record
-                        {rows.length !== 1 ? "s" : ""}
-                    </p>
+                                    ) : (
+                                        <>
+                                            {rows.map((row, i) => (
+                                                <tr
+                                                    key={i}
+                                                    className={
+                                                        i % 2 === 0
+                                                            ? "bg-white"
+                                                            : "bg-slate-50"
+                                                    }
+                                                >
+                                                    <td className="px-2 py-1 text-center text-[9.5px] border border-slate-200 font-semibold text-slate-400">
+                                                        {i + 1}
+                                                    </td>
+                                                    <td className="px-2 py-1 text-[9.5px] border border-slate-200 whitespace-nowrap font-mono text-slate-500">
+                                                        {row.code}
+                                                    </td>
+                                                    <td className="px-2 py-1 text-[10px] font-semibold border border-slate-200 whitespace-nowrap">
+                                                        {row.name}
+                                                    </td>
+                                                    <td className="px-2 py-1 text-[9.5px] border border-slate-200 whitespace-nowrap font-mono text-slate-500">
+                                                        {row.number}
+                                                    </td>
+                                                    {showPeriod && (
+                                                        <td className="px-2 py-1 text-center text-[9.5px] border border-slate-200 whitespace-nowrap text-slate-500">
+                                                            {row.period}
+                                                        </td>
+                                                    )}
+                                                    <td className="px-2 py-1 text-right text-[10px] border border-slate-200 whitespace-nowrap font-semibold text-slate-800">
+                                                        {f2(row.employee)}
+                                                    </td>
+                                                    <td className="px-2 py-1 text-right text-[10px] border border-slate-200 whitespace-nowrap text-slate-600">
+                                                        {f2(row.employer)}
+                                                    </td>
+                                                    <td className="px-2 py-1 text-right text-[10px] border border-slate-200 whitespace-nowrap font-bold text-slate-800 bg-blue-50">
+                                                        {f2(
+                                                            row.employee +
+                                                                row.employer,
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            <tr className="bg-slate-800 text-white">
+                                                <td
+                                                    colSpan={
+                                                        showPeriod ? 5 : 4
+                                                    }
+                                                    className="px-3 py-1.5 text-[9px] font-bold uppercase tracking-wider border border-slate-600"
+                                                >
+                                                    Total
+                                                </td>
+                                                <td className="px-2 py-1.5 text-right text-[10px] font-bold text-white border border-slate-600 whitespace-nowrap">
+                                                    {f2(t.employee)}
+                                                </td>
+                                                <td className="px-2 py-1.5 text-right text-[10px] font-bold text-white border border-slate-600 whitespace-nowrap">
+                                                    {f2(t.employer)}
+                                                </td>
+                                                <td className="px-2 py-1.5 text-right text-[10px] font-bold text-white border border-slate-600 whitespace-nowrap">
+                                                    {f2(t.total)}
+                                                </td>
+                                            </tr>
+                                        </>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                        <p className="mt-3 text-xs text-slate-400 text-right">
+                            {rows.length} record{rows.length !== 1 ? "s" : ""}
+                        </p>
                     </div>
                 </div>
             )}
@@ -690,4 +717,4 @@ const LoansReport = () => {
     );
 };
 
-export default LoansReport;
+export default GovContributionsReport;

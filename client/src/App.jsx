@@ -208,6 +208,10 @@ const router = createBrowserRouter([
                 lazy: page(() => import("./pages/LeavesReport")),
             },
             {
+                path: "gov-contributions",
+                lazy: page(() => import("./pages/GovContributionsReport")),
+            },
+            {
                 path: "users",
                 lazy: page(() => import("./pages/Users")),
             },
