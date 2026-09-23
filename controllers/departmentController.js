@@ -1,9 +1,10 @@
 import { StatusCodes } from "http-status-codes";
 import Department from "../models/Department.js";
+import EmployeeDesignation from "../models/EmployeeDesignation.js";
 import { NotFoundError } from "../errors/customErrors.js";
 
 export const getAllDepartments = async (req, res) => {
-    const { page = 1, limit = 10, search = "" } = req.query;
+    const { page = 1, limit = 10, search = "", client = "" } = req.query;
 
     const pageNum = Math.max(1, Number(page));
     const limitNum = Math.max(1, Number(limit));
@@ -12,6 +13,16 @@ export const getAllDepartments = async (req, res) => {
     const query = search
         ? { departmentName: { $regex: search, $options: "i" } }
         : {};
+
+    // Narrowed to the departments this client actually staffs. There are a
+    // hundred on file and a client uses a handful, so an unfiltered picker is
+    // mostly wrong answers.
+    if (client) {
+        const used = await EmployeeDesignation.distinct("department", {
+            client,
+        });
+        query._id = { $in: used };
+    }
 
     const totalDepartments = await Department.countDocuments(query);
     const totalPages = Math.ceil(totalDepartments / limitNum);

@@ -136,6 +136,9 @@ const RecordModal = ({ initial, chargeTypes, onClose, onSaved }) => {
         chargeType: initial?.chargeType?._id ?? initial?.chargeType ?? "",
         name: initial?.name ?? "",
         amount: initial?.amount ?? "",
+        chargeDate: initial?.chargeDate
+            ? String(initial.chargeDate).slice(0, 10)
+            : "",
     });
 
     const set = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
@@ -148,6 +151,9 @@ const RecordModal = ({ initial, chargeTypes, onClose, onSaved }) => {
                 chargeType: form.chargeType,
                 name: form.name,
                 amount: Number(form.amount),
+                // Sent even when empty so clearing the date takes effect; the
+                // server keeps fields the body leaves out.
+                chargeDate: form.chargeDate || null,
             };
             if (isEdit) {
                 await customFetch.patch(`/charge-records/${initial._id}`, body);
@@ -222,9 +228,25 @@ const RecordModal = ({ initial, chargeTypes, onClose, onSaved }) => {
                         />
                     </div>
 
+                    <div className="flex flex-col gap-1">
+                        <label className={labelCls}>Charge Date (optional)</label>
+                        <input
+                            type="date"
+                            value={form.chargeDate}
+                            onChange={set("chargeDate")}
+                            className={inputCls}
+                        />
+                        <p className="text-[11px] text-slate-400">
+                            Leave blank to put this on the next payroll run. Set
+                            a date to hold it until a cutoff that reaches that
+                            date — useful for keying a charge in early.
+                        </p>
+                    </div>
+
                     {!isEdit && (
                         <p className="text-xs text-slate-400 italic">
-                            Not linked to a specific payroll — it'll be auto-attached the next time payroll is processed for this employee.
+                            Not linked to a payroll yet — it will be attached
+                            when payroll is next processed for this employee.
                         </p>
                     )}
 
@@ -396,7 +418,11 @@ const Charges = () => {
                                     </p>
                                     <p className="text-xs text-slate-500 mt-0.5">{rec.chargeType?.chargeName ?? "—"} · {rec.name}</p>
                                     <p className="text-xs text-slate-400 mt-0.5">
-                                        {rec.payroll ? `${fmtDate(rec.payroll.payrollFrom)} – ${fmtDate(rec.payroll.payrollTo)}` : "Standing (unlinked)"}
+                                        {rec.payroll
+                                            ? `${fmtDate(rec.payroll.payrollFrom)} – ${fmtDate(rec.payroll.payrollTo)}`
+                                            : rec.chargeDate
+                                              ? `Standing — for ${fmtDate(rec.chargeDate)}`
+                                              : "Standing (next run)"}
                                     </p>
                                 </div>
                                 {mayEdit && (
@@ -453,9 +479,17 @@ const Charges = () => {
                                 </td>
                                 <td className="px-4 py-3 text-slate-700">{rec.name}</td>
                                 <td className="px-4 py-3 text-slate-500 text-xs">
-                                    {rec.payroll
-                                        ? `${fmtDate(rec.payroll.payrollFrom)} – ${fmtDate(rec.payroll.payrollTo)}`
-                                        : <span className="italic text-slate-400">Standing (unlinked)</span>}
+                                    {rec.payroll ? (
+                                        `${fmtDate(rec.payroll.payrollFrom)} – ${fmtDate(rec.payroll.payrollTo)}`
+                                    ) : rec.chargeDate ? (
+                                        <span className="italic text-slate-400">
+                                            Standing — for {fmtDate(rec.chargeDate)}
+                                        </span>
+                                    ) : (
+                                        <span className="italic text-slate-400">
+                                            Standing (next run)
+                                        </span>
+                                    )}
                                 </td>
                                 <td className="px-4 py-3 text-right font-medium text-slate-700">
                                     {fmt(rec.amount)}

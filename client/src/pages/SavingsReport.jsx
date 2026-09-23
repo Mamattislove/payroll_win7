@@ -12,7 +12,7 @@ import {
 } from "@react-pdf/renderer";
 import customFetch from "../../utils/customFetch";
 import { EMPLOYMENT_STATUS } from "../../../utils/constants";
-import { ClientCombobox } from "../components";
+import { ClientCombobox, DepartmentSelect } from "../components";
 import logo from "../assets/ynl.png";
 
 export const loader = async () => {
@@ -170,7 +170,7 @@ const S = StyleSheet.create({
 });
 
 const SavingsPDF = ({ report }) => {
-    const { rows, showPeriod, clientName, dateFrom, dateTo } = report;
+    const { rows, showPeriod, clientName, departmentName, dateFrom, dateTo } = report;
 
     return (
         <Document>
@@ -196,7 +196,10 @@ const SavingsPDF = ({ report }) => {
                         CLIENT: <Text style={S.metaBold}>{clientName}</Text>
                     </Text>
                     <Text>
-                        {"   "}DEPARTMENT: <Text style={S.metaBold}>ALL</Text>
+                        {"   "}DEPARTMENT:{" "}
+                        <Text style={S.metaBold}>
+                            {departmentName || "ALL"}
+                        </Text>
                     </Text>
                 </View>
 
@@ -297,6 +300,8 @@ const SavingsReport = () => {
     const { clients } = useLoaderData();
     const [filter, setFilter] = useState({
         clientId: "",
+        departmentId: "",
+        departmentName: "",
         dateFrom: "",
         dateTo: "",
     });
@@ -321,6 +326,8 @@ const SavingsReport = () => {
                 limit: 10000,
                 employeeStatus: EMPLOYMENT_STATUS.ACTIVE,
             });
+            if (filter.departmentId)
+                params.set("department", filter.departmentId);
             const { data } = await customFetch.get(`/payrolls?${params}`);
             const { rows, showPeriod } = buildRows(data.payrolls || []);
             setReport({
@@ -329,6 +336,7 @@ const SavingsReport = () => {
                 clientName:
                     clients.find((c) => c._id === filter.clientId)
                         ?.clientName ?? "",
+                departmentName: filter.departmentName,
                 dateFrom: filter.dateFrom,
                 dateTo: filter.dateTo,
             });
@@ -381,8 +389,28 @@ const SavingsReport = () => {
                             clients={clients}
                             value={filter.clientId}
                             onChange={(id) =>
-                                setFilter((p) => ({ ...p, clientId: id }))
+                                setFilter((p) => ({
+                                    ...p,
+                                    clientId: id,
+                                    departmentId: "",
+                                    departmentName: "",
+                                }))
                             }
+                        />
+                    </div>
+                    <div className="min-w-44">
+                        <label className={labelCls}>Department</label>
+                        <DepartmentSelect
+                            clientId={filter.clientId}
+                            value={filter.departmentId}
+                            onChange={(id, name) =>
+                                setFilter((p) => ({
+                                    ...p,
+                                    departmentId: id,
+                                    departmentName: name,
+                                }))
+                            }
+                            className={`${inputCls} disabled:opacity-60`}
                         />
                     </div>
                     <div>
@@ -462,7 +490,8 @@ const SavingsReport = () => {
                     <p className="text-xs mb-3">
                         CLIENT: <strong>{report.clientName}</strong>
                         <span className="ml-6">
-                            DEPARTMENT: <strong>ALL</strong>
+                            DEPARTMENT:{" "}
+                            <strong>{report.departmentName || "ALL"}</strong>
                         </span>
                     </p>
 

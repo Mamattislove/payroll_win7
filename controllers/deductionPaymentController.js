@@ -12,7 +12,7 @@ const paymentPopulate = [
         select: "name employee deductionType initialAmount currentAmount monthlyDeduction",
         populate: [
             { path: "employee", select: "firstName lastName employeeCode" },
-            { path: "deductionType", select: "deductionName" },
+            { path: "deductionType", select: "deductionName printOnAcknowledgement" },
         ],
     },
     { path: "payroll", select: "payrollFrom payrollTo" },

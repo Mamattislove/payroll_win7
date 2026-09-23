@@ -294,9 +294,12 @@ async function generateLoanInstances(payrollId, employeeId, payrollTo) {
  * report filtered this way changes as people leave. That is the caller's
  * choice to make -- see the reports, which ask for active only.
  */
-async function compensationIdsForClient(client, employeeStatus) {
+async function compensationIdsForClient(client, employeeStatus, department) {
     const designationFilter = {};
     if (client) designationFilter.client = client;
+    // A designation carries both, so narrowing by department is the same lookup
+    // -- no extra query, and it composes with the client filter.
+    if (department) designationFilter.department = department;
     if (employeeStatus) {
         const employees = await Employee.find({
             employmentStatus: employeeStatus,
@@ -367,6 +370,7 @@ export const getAllPayrolls = async (req, res) => {
         payrollFrom,
         payrollTo,
         client,
+        department,
         employeeStatus,
     } = req.query;
 
@@ -375,9 +379,13 @@ export const getAllPayrolls = async (req, res) => {
     const skip = (pageNum - 1) * limitNum;
 
     const query = {};
-    if ((client || employeeStatus) && !compensation) {
+    if ((client || employeeStatus || department) && !compensation) {
         query.compensation = {
-            $in: await compensationIdsForClient(client, employeeStatus),
+            $in: await compensationIdsForClient(
+                client,
+                employeeStatus,
+                department,
+            ),
         };
     }
     if (compensation) query.compensation = compensation;
@@ -405,7 +413,7 @@ export const getAllPayrolls = async (req, res) => {
                 select: "name employee deductionType initialAmount currentAmount monthlyDeduction",
                 populate: [
                     { path: "employee", select: "firstName lastName employeeCode" },
-                    { path: "deductionType", select: "deductionName" },
+                    { path: "deductionType", select: "deductionName printOnAcknowledgement" },
                 ],
             },
         })
@@ -577,11 +585,26 @@ async function generatePayrollFor(
         excludedFromPayroll: { $ne: true },
     };
 
+    // A charge may name the cutoff it belongs to. One dated after this period
+    // is left standing for a later run, so it can be keyed in early without
+    // landing on the wrong payslip. Anything dated on or before the period end
+    // is collected -- including a charge dated to a cutoff already run, which
+    // would otherwise be stranded with no payroll left to claim it. A charge
+    // with no date keeps the original behaviour of going on the next run.
+    const chargeUnlinked = {
+        ...unlinked,
+        $or: [
+            { chargeDate: null },
+            { chargeDate: { $exists: false } },
+            { chargeDate: { $lte: utcDayEnd(payrollTo) } },
+        ],
+    };
+
     // Auto-attach all unlinked standing records for this employee
     await Promise.all([
         EarningRecord.updateMany(unlinked, { payroll: payroll._id }),
         AllowanceRecord.updateMany(unlinked, { payroll: payroll._id }),
-        ChargeRecord.updateMany(unlinked, { payroll: payroll._id }),
+        ChargeRecord.updateMany(chargeUnlinked, { payroll: payroll._id }),
     ]);
 
     if (autoDeductDeductions) {

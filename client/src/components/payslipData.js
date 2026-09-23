@@ -68,12 +68,50 @@ const normaliseLabel = (name) => {
     return LABEL_ALIASES[upper] ?? upper;
 };
 
+/**
+ * A deduction prints on the acknowledgment receipt when its type is marked
+ * printOnAcknowledgement. Savings always do: the receipt has a pre-printed
+ * SAVINGS line, which is what it is for.
+ */
+export const movesToAcknowledgement = (d) =>
+    d?.deductionRecord?.deductionType?.printOnAcknowledgement === true;
+
+/**
+ * The peso amount relocated off the payslip for this payroll. NET PAY on the
+ * slip is raised by exactly this, because the stored netSalary has already
+ * subtracted it -- leaving it in both places would charge the employee twice
+ * and FINAL PAY would come out short.
+ */
+export function acknowledgementTotal(p) {
+    const savings = (p.savings || []).reduce((a, r) => a + (r.amount || 0), 0);
+    const moved = (p.deductions || [])
+        .filter(movesToAcknowledgement)
+        .reduce((a, r) => a + (r.amount || 0), 0);
+    return savings + moved;
+}
+
 export function particularLines(payroll) {
     const totals = new Map(PARTICULAR_LABELS.map((l) => [l, 0]));
 
     for (const c of payroll.charges || []) {
         const label = normaliseLabel(c.chargeType?.chargeName || c.name);
         totals.set(label, (totals.get(label) ?? 0) + (c.amount || 0));
+    }
+
+    // Savings land on the pre-printed SAVINGS line.
+    for (const sv of payroll.savings || []) {
+        totals.set("SAVINGS", (totals.get("SAVINGS") ?? 0) + (sv.amount || 0));
+    }
+
+    // Deductions whose type is marked for the receipt land on the line their
+    // name matches, or on their own line beneath the printed ones.
+    for (const d of payroll.deductions || []) {
+        if (!movesToAcknowledgement(d)) continue;
+        const label = normaliseLabel(
+            d.deductionRecord?.deductionType?.deductionName ||
+                d.deductionRecord?.name,
+        );
+        totals.set(label, (totals.get(label) ?? 0) + (d.amount || 0));
     }
 
     // Known labels first, in printed order; anything unrecognised after, so a
@@ -109,7 +147,10 @@ export function deductionLines(p) {
     for (const l of p.loans || []) {
         optional(l.loan?.loanType?.loanTypeName || l.loan?.loanName || "Loan", l.amount);
     }
+    // Deductions marked for the acknowledgment receipt, and savings, print
+    // there instead -- see particularLines.
     for (const d of p.deductions || []) {
+        if (movesToAcknowledgement(d)) continue;
         optional(
             d.deductionRecord?.deductionType?.deductionName ||
                 d.deductionRecord?.name ||
@@ -117,7 +158,6 @@ export function deductionLines(p) {
             d.amount,
         );
     }
-    for (const sv of p.savings || []) optional("Savings", sv.amount);
 
     // Attendance-driven deductions. Absent from the printed slip because the
     // sample employee had none, but hiding them would make the slip stop
@@ -185,6 +225,14 @@ export function buildSlipModel(payroll, attendance = []) {
     const particulars = particularLines(p);
     const particularsTotal = particulars.reduce((a, r) => a + r.value, 0);
 
+    // Everything moved to the receipt is added back to NET PAY and taken out of
+    // TOTAL deductions, because the stored netSalary and totalDeductions both
+    // already have it. FINAL PAY is untouched by the move:
+    //   (netSalary + moved) - (charges + moved) = netSalary - charges
+    const moved = acknowledgementTotal(p);
+    const netPay = (p.netSalary || 0) + moved;
+    const totalDeductions = (p.totalDeductions || 0) - moved;
+
     return {
         employee: emp,
         employeeCode: emp?.employeeCode || "—",
@@ -208,10 +256,10 @@ export function buildSlipModel(payroll, attendance = []) {
             allowances,
         },
         deductions: deductionLines(p),
-        totalDeductions: p.totalDeductions || 0,
-        netPay: p.netSalary || 0,
+        totalDeductions,
+        netPay,
         particulars,
         particularsTotal,
-        finalPay: p.finalPay ?? (p.netSalary || 0) - particularsTotal,
+        finalPay: p.finalPay ?? netPay - particularsTotal,
     };
 }

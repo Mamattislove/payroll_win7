@@ -6,6 +6,7 @@ export { default as Nav } from "./common/Nav";
 export { default as Sidebar } from "./common/Sidebar";
 export { default as CommandPalette } from "./common/CommandPalette";
 export { default as ClientCombobox } from "./common/ClientCombobox";
+export { default as DepartmentSelect } from "./common/DepartmentSelect";
 export { default as SelectField } from "./common/SelectField";
 export { default as InfoField } from "./common/InfoField";
 export { default as ConfirmModal, useConfirm } from "./common/ConfirmModal";

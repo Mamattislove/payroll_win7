@@ -11,6 +11,7 @@ export const validateDeductionTypeInput = withValidationErrors([
             if (existing) throw new Error("deduction name already exists");
         }),
     body("deductionDesc").optional(),
+    body("printOnAcknowledgement").optional().isBoolean().toBoolean(),
 ]);
 
 export const validateDeductionTypeUpdateInput = withValidationErrors([
@@ -21,6 +22,7 @@ export const validateDeductionTypeUpdateInput = withValidationErrors([
             if (existing) throw new Error("deduction name already exists");
         }),
     body("deductionDesc").optional(),
+    body("printOnAcknowledgement").optional().isBoolean().toBoolean(),
 ]);
 
 export const validateDeductionTypeParamId = async (req, res, next) => {

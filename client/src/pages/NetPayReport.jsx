@@ -12,7 +12,7 @@ import {
 } from "@react-pdf/renderer";
 import customFetch from "../../utils/customFetch";
 import { EMPLOYMENT_STATUS } from "../../../utils/constants";
-import { ClientCombobox } from "../components";
+import { ClientCombobox, DepartmentSelect } from "../components";
 import logo from "../assets/ynl.png";
 
 export const loader = async () => {
@@ -205,7 +205,7 @@ const S = StyleSheet.create({
 });
 
 const NetPayPDF = ({ report }) => {
-    const { rows, chargeColumns, clientName, dateFrom, dateTo } = report;
+    const { rows, chargeColumns, clientName, departmentName, dateFrom, dateTo } = report;
     const t = sumRows(rows, chargeColumns);
 
     return (
@@ -228,6 +228,10 @@ const NetPayPDF = ({ report }) => {
                 <View style={S.meta}>
                     <Text>
                         CLIENT: <Text style={S.metaBold}>{clientName}</Text>
+                        {"   "}DEPARTMENT:{" "}
+                        <Text style={S.metaBold}>
+                            {departmentName || "ALL"}
+                        </Text>
                     </Text>
                 </View>
 
@@ -404,6 +408,8 @@ const NetPayReport = () => {
     const { clients } = useLoaderData();
     const [filter, setFilter] = useState({
         clientId: "",
+        departmentId: "",
+        departmentName: "",
         dateFrom: "",
         dateTo: "",
     });
@@ -431,6 +437,8 @@ const NetPayReport = () => {
                 limit: 10000,
                 employeeStatus: EMPLOYMENT_STATUS.ACTIVE,
             });
+            if (filter.departmentId)
+                params.set("department", filter.departmentId);
             const { data } = await customFetch.get(`/payrolls?${params}`);
             const { rows, chargeColumns } = buildReport(data.payrolls || []);
             const clientName =
@@ -440,6 +448,7 @@ const NetPayReport = () => {
                 rows,
                 chargeColumns,
                 clientName,
+                departmentName: filter.departmentName,
                 dateFrom: filter.dateFrom,
                 dateTo: filter.dateTo,
             });
@@ -491,8 +500,28 @@ const NetPayReport = () => {
                             clients={clients}
                             value={filter.clientId}
                             onChange={(id) =>
-                                setFilter((p) => ({ ...p, clientId: id }))
+                                setFilter((p) => ({
+                                    ...p,
+                                    clientId: id,
+                                    departmentId: "",
+                                    departmentName: "",
+                                }))
                             }
+                        />
+                    </div>
+                    <div className="min-w-44">
+                        <label className={labelCls}>Department</label>
+                        <DepartmentSelect
+                            clientId={filter.clientId}
+                            value={filter.departmentId}
+                            onChange={(id, name) =>
+                                setFilter((p) => ({
+                                    ...p,
+                                    departmentId: id,
+                                    departmentName: name,
+                                }))
+                            }
+                            className={`${inputCls} disabled:opacity-60`}
                         />
                     </div>
                     <div>
@@ -566,6 +595,10 @@ const NetPayReport = () => {
                     </div>
                     <p className="text-xs mb-3">
                         CLIENT: <strong>{report.clientName}</strong>
+                        <span className="ml-6">
+                            DEPARTMENT:{" "}
+                            <strong>{report.departmentName || "ALL"}</strong>
+                        </span>
                     </p>
 
                     <div

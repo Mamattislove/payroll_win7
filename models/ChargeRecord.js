@@ -12,6 +12,12 @@ const chargeRecordSchema = new mongoose.Schema(
         // for this employee sweeps up everything unattached, putting the
         // removed record straight back.
         excludedFromPayroll: { type: Boolean, default: false },
+        // The cutoff this charge is meant for. Optional: a charge without one
+        // is collected by the next payroll run for the employee, which is how
+        // every record created before this field existed behaves. With one set,
+        // the charge waits for a run whose period reaches that date, so it can
+        // be keyed in early for a later cutoff without landing on this one.
+        chargeDate: { type: Date },
         chargeType: { type: ObjectId, ref: "ChargeType", required: true },
         name: { type: String, required: true },
         amount: { type: Number, required: true },

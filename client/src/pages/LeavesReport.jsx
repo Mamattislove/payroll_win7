@@ -12,7 +12,7 @@ import {
 } from "@react-pdf/renderer";
 import customFetch from "../../utils/customFetch";
 import { LEAVE_STATUS, LEAVE_HALFDAY } from "../../../utils/constants";
-import { ClientCombobox } from "../components";
+import { ClientCombobox, DepartmentSelect } from "../components";
 import logo from "../assets/ynl.png";
 
 export const loader = async () => {
@@ -184,7 +184,7 @@ const S = StyleSheet.create({
 });
 
 const LeavesPDF = ({ report }) => {
-    const { rows, clientName, dateFrom, dateTo, statusLabel } = report;
+    const { rows, clientName, departmentName, dateFrom, dateTo, statusLabel } = report;
 
     return (
         <Document>
@@ -210,7 +210,10 @@ const LeavesPDF = ({ report }) => {
                         CLIENT: <Text style={S.metaBold}>{clientName}</Text>
                     </Text>
                     <Text>
-                        {"   "}DEPARTMENT: <Text style={S.metaBold}>ALL</Text>
+                        {"   "}DEPARTMENT:{" "}
+                        <Text style={S.metaBold}>
+                            {departmentName || "ALL"}
+                        </Text>
                     </Text>
                     <Text>
                         {"   "}STATUS:{" "}
@@ -332,6 +335,8 @@ const LeavesReport = () => {
     const { clients } = useLoaderData();
     const [filter, setFilter] = useState({
         clientId: "",
+        departmentId: "",
+        departmentName: "",
         dateFrom: "",
         dateTo: "",
         status: LEAVE_STATUS.APPROVED,
@@ -357,6 +362,8 @@ const LeavesReport = () => {
                 limit: 10000,
                 sort: "dateFrom",
             });
+            if (filter.departmentId)
+                params.set("department", filter.departmentId);
             if (filter.status) params.set("status", filter.status);
             const { data } = await customFetch.get(
                 `/leave-applications?${params}`,
@@ -366,6 +373,7 @@ const LeavesReport = () => {
                 clientName:
                     clients.find((c) => c._id === filter.clientId)
                         ?.clientName ?? "",
+                departmentName: filter.departmentName,
                 dateFrom: filter.dateFrom,
                 dateTo: filter.dateTo,
                 statusLabel: filter.status ? filter.status : "ALL",
@@ -418,8 +426,28 @@ const LeavesReport = () => {
                             clients={clients}
                             value={filter.clientId}
                             onChange={(id) =>
-                                setFilter((p) => ({ ...p, clientId: id }))
+                                setFilter((p) => ({
+                                    ...p,
+                                    clientId: id,
+                                    departmentId: "",
+                                    departmentName: "",
+                                }))
                             }
+                        />
+                    </div>
+                    <div className="min-w-44">
+                        <label className={labelCls}>Department</label>
+                        <DepartmentSelect
+                            clientId={filter.clientId}
+                            value={filter.departmentId}
+                            onChange={(id, name) =>
+                                setFilter((p) => ({
+                                    ...p,
+                                    departmentId: id,
+                                    departmentName: name,
+                                }))
+                            }
+                            className={`${inputCls} disabled:opacity-60`}
                         />
                     </div>
                     <div>
@@ -519,7 +547,8 @@ const LeavesReport = () => {
                     <p className="text-xs mb-3">
                         CLIENT: <strong>{report.clientName}</strong>
                         <span className="ml-6">
-                            DEPARTMENT: <strong>ALL</strong>
+                            DEPARTMENT:{" "}
+                            <strong>{report.departmentName || "ALL"}</strong>
                         </span>
                         <span className="ml-6">
                             STATUS: <strong>{report.statusLabel}</strong>

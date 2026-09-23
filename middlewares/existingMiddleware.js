@@ -288,7 +288,7 @@ export const existingPayroll = async (payrollId) => {
                 select: "name employee deductionType initialAmount currentAmount monthlyDeduction",
                 populate: [
                     { path: "employee", select: "firstName lastName employeeCode" },
-                    { path: "deductionType", select: "deductionName" },
+                    { path: "deductionType", select: "deductionName printOnAcknowledgement" },
                 ],
             },
         })
@@ -336,7 +336,7 @@ export const existingDeductionRecord = async (deductionRecordId) => {
     if (!isValidMongoId(deductionRecordId)) throw new BadRequestError("invalid deduction record id");
     const deductionRecord = await DeductionRecord.findById(deductionRecordId)
         .populate("employee", "firstName lastName employeeCode")
-        .populate("deductionType", "deductionName");
+        .populate("deductionType", "deductionName printOnAcknowledgement");
     if (!deductionRecord) throw new BadRequestError("deduction record does not exist");
     return deductionRecord;
 };
@@ -358,7 +358,7 @@ export const existingDeductionPayment = async (deductionPaymentId) => {
             select: "name employee deductionType initialAmount currentAmount monthlyDeduction",
             populate: [
                 { path: "employee", select: "firstName lastName employeeCode" },
-                { path: "deductionType", select: "deductionName" },
+                { path: "deductionType", select: "deductionName printOnAcknowledgement" },
             ],
         });
     if (!deductionPayment) throw new BadRequestError("deduction payment does not exist");

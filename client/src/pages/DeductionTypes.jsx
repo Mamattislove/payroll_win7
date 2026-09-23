@@ -37,19 +37,25 @@ const DeductionTypes = () => {
 
     const [editItem, setEditItem] = useState(null);
     const [adding, setAdding] = useState(false);
-    const [form, setForm] = useState({ deductionName: "", deductionDesc: "" });
+    const [form, setForm] = useState({ deductionName: "", deductionDesc: "", printOnAcknowledgement: false });
     const [saving, setSaving] = useState(false);
 
     const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+    const setChecked = (k) => (e) =>
+        setForm((f) => ({ ...f, [k]: e.target.checked }));
 
     const startAdd = () => {
-        setForm({ deductionName: "", deductionDesc: "" });
+        setForm({ deductionName: "", deductionDesc: "", printOnAcknowledgement: false });
         setEditItem(null);
         setAdding(true);
     };
 
     const startEdit = (item) => {
-        setForm({ deductionName: item.deductionName, deductionDesc: item.deductionDesc || "" });
+        setForm({
+            deductionName: item.deductionName,
+            deductionDesc: item.deductionDesc || "",
+            printOnAcknowledgement: item.printOnAcknowledgement === true,
+        });
         setEditItem(item);
         setAdding(false);
     };
@@ -60,7 +66,12 @@ const DeductionTypes = () => {
         e.preventDefault();
         setSaving(true);
         try {
-            const body = { deductionName: form.deductionName };
+            const body = {
+                deductionName: form.deductionName,
+                // Sent unconditionally: a conditional would make unticking the
+                // box a no-op, since the server keeps fields the body omits.
+                printOnAcknowledgement: form.printOnAcknowledgement,
+            };
             if (form.deductionDesc) body.deductionDesc = form.deductionDesc;
             if (editItem) {
                 await customFetch.patch(`/deduction-types/${editItem._id}`, body);
@@ -119,6 +130,7 @@ const DeductionTypes = () => {
                             <th className="px-4 py-3 text-left">#</th>
                             <th className="px-4 py-3 text-left">Name</th>
                             <th className="px-4 py-3 text-left">Description</th>
+                            <th className="px-4 py-3 text-left">Prints On</th>
                             {mayEdit && (
                                 <th className="px-4 py-3 text-center">Actions</th>
                             )}
@@ -127,7 +139,7 @@ const DeductionTypes = () => {
                     <tbody className="divide-y divide-slate-100">
                         {deductionTypes.length === 0 && (
                             <tr>
-                                <td colSpan={mayEdit ? 4 : 3} className="px-4 py-8 text-center text-slate-400">
+                                <td colSpan={mayEdit ? 5 : 4} className="px-4 py-8 text-center text-slate-400">
                                     No deduction types yet.
                                 </td>
                             </tr>
@@ -137,6 +149,11 @@ const DeductionTypes = () => {
                                 <td className="px-4 py-3 text-slate-400">{idx + 1}</td>
                                 <td className="px-4 py-3 font-medium text-slate-800">{item.deductionName}</td>
                                 <td className="px-4 py-3 text-slate-500">{item.deductionDesc || "—"}</td>
+                                <td className="px-4 py-3">
+                                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded leading-tight ${item.printOnAcknowledgement ? "bg-amber-50 text-amber-700" : "bg-slate-100 text-slate-500"}`}>
+                                        {item.printOnAcknowledgement ? "Acknowledgment" : "Payslip"}
+                                    </span>
+                                </td>
                                 {mayEdit && (
                                     <td className="px-4 py-3">
                                         <div className="flex items-center justify-center gap-2">
@@ -175,6 +192,24 @@ const DeductionTypes = () => {
                                 <label className="block text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1">Description</label>
                                 <input value={form.deductionDesc} onChange={set("deductionDesc")} placeholder="Optional" className={inputCls} />
                             </div>
+                            <label className="flex items-start gap-2.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={form.printOnAcknowledgement}
+                                    onChange={setChecked("printOnAcknowledgement")}
+                                    className="mt-0.5"
+                                />
+                                <span>
+                                    <span className="block text-sm text-slate-800">
+                                        Print on acknowledgment receipt
+                                    </span>
+                                    <span className="block text-[11px] text-slate-500 mt-0.5">
+                                        Shows under PARTICULARS instead of the
+                                        payslip deductions. The amount and the
+                                        employee&apos;s final pay are unchanged.
+                                    </span>
+                                </span>
+                            </label>
                             <div className="flex justify-end gap-2 pt-1">
                                 <button type="button" onClick={cancel} className="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">Cancel</button>
                                 <button type="submit" disabled={saving} className="px-4 py-2 rounded-lg bg-slate-900 text-sm text-white hover:bg-slate-700 disabled:opacity-60">

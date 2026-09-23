@@ -14,8 +14,11 @@ const utcDayEnd = (d) => new Date(`${String(d).slice(0, 10)}T23:59:59.999Z`);
 // A leave belongs to a client through the employee's designation; the leave
 // record itself carries no client. More than one designation can point at the
 // same employee, so the ids are de-duplicated.
-const employeeIdsForClient = async (client) => {
-    const designations = await EmployeeDesignation.find({ client }).select(
+const employeeIdsForClient = async (client, department) => {
+    const filter = {};
+    if (client) filter.client = client;
+    if (department) filter.department = department;
+    const designations = await EmployeeDesignation.find(filter).select(
         "employee",
     );
     return [...new Set(designations.map((d) => String(d.employee)))];
@@ -28,6 +31,7 @@ export const getAllLeaveApplications = async (req, res) => {
         employee,
         status,
         client,
+        department,
         from,
         to,
         sort = "-dateFrom",
@@ -37,8 +41,10 @@ export const getAllLeaveApplications = async (req, res) => {
     const query = {};
     if (employee) query.employee = employee;
     if (status) query.status = status;
-    if (client && !employee)
-        query.employee = { $in: await employeeIdsForClient(client) };
+    if ((client || department) && !employee)
+        query.employee = {
+            $in: await employeeIdsForClient(client, department),
+        };
     // Overlap, not containment: a leave that starts before the range and ends
     // inside it was still taken during the period being reported on.
     if (from) query.dateTo = { $gte: utcDayStart(from) };
