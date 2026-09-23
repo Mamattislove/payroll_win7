@@ -9,7 +9,6 @@ import Compensation from "../models/Compensation.js";
 import { derivePayrollTotals } from "./payrollTotals.js";
 import { computeGovContributions } from "./computeGovContributions.js";
 import { contributionFactor } from "./contributionFactor.js";
-import { SSS_CONTRIBUTION_BASIS } from "./constants.js";
 
 const r2 = (n) => Math.round(n * 100) / 100;
 const sum = (records) => records.reduce((acc, r) => acc + (r.amount ?? 0), 0);
@@ -46,13 +45,12 @@ async function recomputeGrossBasisContributions(
     ).lean();
     if (!compensation) return stored;
 
-    const bases = [
-        compensation.sssContributionBasis,
-        compensation.philhealthContributionBasis,
-        compensation.pagibigContributionBasis,
-    ];
-    if (!bases.includes(SSS_CONTRIBUTION_BASIS.GROSS_PAY)) return stored;
-
+    // Every basis now reads this run rather than a standing rate: "basic pay"
+    // is the period's regular pay and "gross pay" is everything earned, so both
+    // move when the attendance behind them is re-keyed. That makes restating
+    // unconditional -- the old guard only restated "gross pay" employees and
+    // would have left a basic-pay employee quoting contributions from the
+    // attendance they had before the correction.
     const periodGross =
         (payroll.regularPay ?? 0) +
         (payroll.regularOTPay ?? 0) +
@@ -66,29 +64,25 @@ async function recomputeGrossBasisContributions(
     const year = new Date(payroll.payrollFrom).getFullYear();
     const fresh = await computeGovContributions(compensation, year, {
         periodGross,
+        periodBasic: payroll.regularPay ?? 0,
     });
     const factor = contributionFactor(
         compensation.payrollPeriod,
         payroll.payrollFrom,
     );
 
-    // Only the bases that are actually "gross pay" are restated; the others
-    // keep the figure stored at creation.
-    const pick = (i, key) =>
-        bases[i] === SSS_CONTRIBUTION_BASIS.GROSS_PAY
-            ? r2((fresh[key] ?? 0) * factor)
-            : stored[key];
+    // Both halves of each contribution are restated together: they come out of
+    // one bracket, and quoting an employee share from one and an employer share
+    // from another is how the two ended up disagreeing before.
+    const at = (key) => r2((fresh[key] ?? 0) * factor);
 
     return {
-        sssContribution: pick(0, "sssContribution"),
-        philhealthContribution: pick(1, "philhealthContribution"),
-        pagibigContribution: pick(2, "pagibigContribution"),
-        sssEmployerContribution: pick(0, "sssEmployerContribution"),
-        philhealthEmployerContribution: pick(
-            1,
-            "philhealthEmployerContribution",
-        ),
-        pagibigEmployerContribution: pick(2, "pagibigEmployerContribution"),
+        sssContribution: at("sssContribution"),
+        philhealthContribution: at("philhealthContribution"),
+        pagibigContribution: at("pagibigContribution"),
+        sssEmployerContribution: at("sssEmployerContribution"),
+        philhealthEmployerContribution: at("philhealthEmployerContribution"),
+        pagibigEmployerContribution: at("pagibigEmployerContribution"),
     };
 }
 

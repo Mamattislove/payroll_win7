@@ -91,14 +91,23 @@ async function unlinkDeductions(paymentDocs) {
     );
 }
 
-// Unlinks earning/allowance/charge records from a payroll (no balance to restore).
-async function unlinkSimpleRecords(Model, payrollId) {
-    // Flagged as well as unlinked. Clearing the payroll alone leaves the
-    // record looking like one that was never attached, and the auto-attach
-    // below would hand it straight to the next payroll for this employee.
+// Unlinks earning/allowance/charge records from a payroll (no balance to
+// restore). `exclude` is what separates the two callers, and they want
+// opposite things.
+//
+// Taking a record off a payroll by hand means "not on this payroll": clearing
+// the link alone would leave it looking like one that was never attached, and
+// the next run would hand it straight back, so it is flagged as excluded.
+//
+// Deleting the whole payroll means the opposite. The payroll is usually about
+// to be generated again, and its records have to be waiting for it -- flagging
+// them excluded there stranded every earning, allowance and charge the payroll
+// carried, invisibly, since nothing clears that flag and the list still shows
+// them as standing.
+async function unlinkSimpleRecords(Model, payrollId, { exclude = true } = {}) {
     await Model.updateMany(
         { payroll: payrollId },
-        { payroll: null, excludedFromPayroll: true },
+        { payroll: null, excludedFromPayroll: exclude },
     );
 }
 
@@ -542,6 +551,9 @@ async function generatePayrollFor(
             holidayRestDayOtPay +
             nightDiffPay +
             leavePay,
+        // "Basic pay" is the regular pay actually earned this period -- the
+        // same figure the payroll journal prints under BASIC PAY.
+        periodBasic: regularPay,
     });
 
     // Government contributions are monthly obligations, so each run deducts
@@ -898,9 +910,11 @@ export const deletePayroll = async (req, res) => {
         unlinkDeductions(linkedDeductions),
         unlinkLoanPayments(linkedLoanPayments),
         SavingsPayment.deleteMany({ payroll: payrollId }),
-        unlinkSimpleRecords(EarningRecord, payrollId),
-        unlinkSimpleRecords(AllowanceRecord, payrollId),
-        unlinkSimpleRecords(ChargeRecord, payrollId),
+        // Back to standing, not excluded: deleting a payroll is how a period
+        // gets redone, and these have to be collectable by the new run.
+        unlinkSimpleRecords(EarningRecord, payrollId, { exclude: false }),
+        unlinkSimpleRecords(AllowanceRecord, payrollId, { exclude: false }),
+        unlinkSimpleRecords(ChargeRecord, payrollId, { exclude: false }),
     ]);
 
     const payroll = await Payroll.findByIdAndDelete(payrollId);

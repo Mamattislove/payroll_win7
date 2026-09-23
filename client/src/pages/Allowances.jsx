@@ -422,9 +422,11 @@ const Allowances = () => {
                                     <p className="text-xs text-slate-400 mt-0.5">
                                         {rec.payroll
                                             ? `${fmtDate(rec.payroll.payrollFrom)} – ${fmtDate(rec.payroll.payrollTo)}`
-                                            : rec.allowanceDate
-                                              ? `Standing — for ${fmtDate(rec.allowanceDate)}`
-                                              : "Standing (next run)"}
+                                            : rec.excludedFromPayroll
+                                              ? "Removed — will not be collected"
+                                              : rec.allowanceDate
+                                                ? `Standing — for ${fmtDate(rec.allowanceDate)}`
+                                                : "Standing (next run)"}
                                     </p>
                                 </div>
                                 {mayEdit && (
@@ -483,6 +485,10 @@ const Allowances = () => {
                                 <td className="px-4 py-3 text-slate-500 text-xs">
                                     {rec.payroll ? (
                                         `${fmtDate(rec.payroll.payrollFrom)} – ${fmtDate(rec.payroll.payrollTo)}`
+                                    ) : rec.excludedFromPayroll ? (
+                                        <span className="italic text-amber-600">
+                                            Removed — will not be collected
+                                        </span>
                                     ) : rec.allowanceDate ? (
                                         <span className="italic text-slate-400">
                                             Standing — for {fmtDate(rec.allowanceDate)}

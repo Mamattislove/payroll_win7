@@ -11,6 +11,7 @@ export const validatePagIbigRateInput = withValidationErrors([
     body("overThresholdEmployeeShare").optional().isNumeric().withMessage("must be a number"),
     body("overThresholdEmployerShare").optional().isNumeric().withMessage("must be a number"),
     body("flatRateMaxDeduction").optional().isNumeric().withMessage("must be a number"),
+    body("employerMaxContribution").optional().isNumeric().withMessage("must be a number"),
     body("percentageRateSalaryThreshold").optional().isNumeric().withMessage("must be a number"),
     body("isBaseline").optional().isBoolean().withMessage("isBaseline must be a boolean"),
 ]);
@@ -24,6 +25,7 @@ export const validatePagIbigRateUpdateInput = withValidationErrors([
     body("overThresholdEmployeeShare").optional().isNumeric().withMessage("must be a number"),
     body("overThresholdEmployerShare").optional().isNumeric().withMessage("must be a number"),
     body("flatRateMaxDeduction").optional().isNumeric().withMessage("must be a number"),
+    body("employerMaxContribution").optional().isNumeric().withMessage("must be a number"),
     body("percentageRateSalaryThreshold").optional().isNumeric().withMessage("must be a number"),
     body("isBaseline").optional().isBoolean().withMessage("isBaseline must be a boolean"),
 ]);

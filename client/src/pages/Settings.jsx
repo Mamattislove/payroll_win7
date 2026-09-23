@@ -7,15 +7,12 @@ import { Overlay, useConfirm } from "../components";
 
 export const loader = async () => {
     try {
-        const [
-            { data: phData },
-            { data: piData },
-            { data: sssData },
-        ] = await Promise.all([
-            customFetch.get("/philhealth-rates?limit=100"),
-            customFetch.get("/pagibig-rates?limit=100"),
-            customFetch.get("/sss-rates?limit=1000"),
-        ]);
+        const [{ data: phData }, { data: piData }, { data: sssData }] =
+            await Promise.all([
+                customFetch.get("/philhealth-rates?limit=100"),
+                customFetch.get("/pagibig-rates?limit=100"),
+                customFetch.get("/sss-rates?limit=1000"),
+            ]);
         return {
             philHealthRates: phData.philHealthRates || [],
             pagIbigRates: piData.pagIbigRates || [],
@@ -31,7 +28,8 @@ export const loader = async () => {
 
 const inputCls =
     "w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800 outline-none focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-100 bg-slate-50";
-const labelCls = "block text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1";
+const labelCls =
+    "block text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1";
 
 const fmt = (v) =>
     v !== undefined && v !== null
@@ -48,17 +46,157 @@ const Field = ({ label, children }) => (
     </div>
 );
 
-const NumInput = ({ name, value, onChange, placeholder, step = "0.01", min = "0" }) => (
-    <input
-        type="number"
-        name={name}
-        value={value ?? ""}
-        onChange={onChange}
-        placeholder={placeholder}
-        step={step}
-        min={min}
-        className={inputCls}
-    />
+const NumInput = ({
+    name,
+    value,
+    onChange,
+    placeholder,
+    step = "0.01",
+    min = "0",
+    prefix,
+}) => (
+    <div className="relative">
+        {prefix && (
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400 pointer-events-none">
+                {prefix}
+            </span>
+        )}
+        <input
+            type="number"
+            name={name}
+            value={value ?? ""}
+            onChange={onChange}
+            placeholder={placeholder}
+            step={step}
+            min={min}
+            className={`${inputCls} ${prefix ? "pl-7" : ""}`}
+        />
+    </div>
+);
+
+/**
+ * A rate typed the way it is spoken. These are stored as decimals -- 0.05 for
+ * 5% -- and were previously edited that way too, with the unit only hinted at
+ * by a "(decimal)" suffix in the label. Typing 5 there meant 500%, silently, so
+ * the field now shows and accepts 5 and converts on the way in and out.
+ */
+const PercentInput = ({ name, value, onChange, placeholder }) => {
+    const shown =
+        value === "" || value == null ? "" : round4(Number(value) * 100);
+    return (
+        <div className="relative">
+            <input
+                type="number"
+                name={name}
+                value={shown}
+                onChange={(e) =>
+                    onChange({
+                        target: {
+                            value:
+                                e.target.value === ""
+                                    ? ""
+                                    : round4(Number(e.target.value) / 100),
+                        },
+                    })
+                }
+                placeholder={placeholder}
+                step="0.01"
+                min="0"
+                className={`${inputCls} pr-8`}
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-slate-400 pointer-events-none">
+                %
+            </span>
+        </div>
+    );
+};
+
+// Percent conversion lands on values like 0.30000000000000004; the tables hold
+// four-decimal rates at most.
+function round4(n) {
+    return Math.round(Number(n) * 1e4) / 1e4;
+}
+
+// A figure the form works out rather than asks for. Shown, not editable, so it
+// cannot disagree with the parts it is made of.
+const ComputedField = ({ label, value, hint }) => (
+    <div>
+        <label className={labelCls}>{label}</label>
+        <div className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 tabular-nums">
+            {fmt(value)}
+        </div>
+        {hint && <p className="text-[10px] text-slate-400 mt-1">{hint}</p>}
+    </div>
+);
+
+const SectionHead = ({ title, note }) => (
+    <div className="mb-2">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-500">
+            {title}
+        </p>
+        {note && <p className="text-[11px] text-slate-400 mt-0.5">{note}</p>}
+    </div>
+);
+
+/**
+ * One shell for all three editors: a header that stays put, a body that
+ * scrolls, and the actions pinned to the bottom. The SSS bracket form runs to
+ * thirteen fields, and its Save button used to scroll off the end of it.
+ */
+const SettingsModal = ({
+    open,
+    onClose,
+    title,
+    subtitle,
+    onSubmit,
+    saving,
+    submitLabel,
+    children,
+}) => (
+    <Overlay isOpen={open} onClose={onClose}>
+        <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl flex flex-col max-h-[88vh]">
+            <div className="flex items-start justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+                <div>
+                    <p className="text-base font-semibold text-slate-800">
+                        {title}
+                    </p>
+                    {subtitle && (
+                        <p className="text-xs text-slate-400 mt-0.5">
+                            {subtitle}
+                        </p>
+                    )}
+                </div>
+                <button
+                    type="button"
+                    onClick={onClose}
+                    className="text-slate-400 hover:text-slate-600 ml-4 mt-0.5"
+                >
+                    <FiX size={18} />
+                </button>
+            </div>
+            <form onSubmit={onSubmit} className="flex flex-col min-h-0 flex-1">
+                <div className="overflow-y-auto px-6 py-5 flex flex-col gap-5">
+                    {children}
+                </div>
+                <div className="flex justify-end gap-2 px-6 py-4 border-t border-slate-100 bg-slate-50 rounded-b-xl shrink-0">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-sm text-slate-600 hover:bg-slate-50"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        type="submit"
+                        disabled={saving}
+                        className="px-5 py-2 rounded-lg bg-slate-900 text-sm text-white hover:bg-slate-700 disabled:opacity-60"
+                    >
+                        {saving ? "Saving…" : submitLabel}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </Overlay>
 );
 
 // ─── PhilHealth tab ───────────────────────────────────────────────────────────
@@ -92,7 +230,11 @@ const PhilHealthTab = ({ rates, onChanged }) => {
         setAdding(false);
     };
 
-    const cancel = () => { setAdding(false); setEditId(null); setForm(emptyPH()); };
+    const cancel = () => {
+        setAdding(false);
+        setEditId(null);
+        setForm(emptyPH());
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -103,7 +245,9 @@ const PhilHealthTab = ({ rates, onChanged }) => {
                 premiumRate: Number(form.premiumRate),
                 employeeShare: Number(form.employeeShare),
                 minimumSalaryThreshold: Number(form.minimumSalaryThreshold),
-                ...(form.deductionCeiling !== "" && { deductionCeiling: Number(form.deductionCeiling) }),
+                ...(form.deductionCeiling !== "" && {
+                    deductionCeiling: Number(form.deductionCeiling),
+                }),
             };
             if (editId) {
                 await customFetch.patch(`/philhealth-rates/${editId}`, payload);
@@ -115,7 +259,11 @@ const PhilHealthTab = ({ rates, onChanged }) => {
             cancel();
             onChanged();
         } catch (err) {
-            toast.error(err?.response?.data?.msg || err?.response?.data?.message || err.message);
+            toast.error(
+                err?.response?.data?.msg ||
+                    err?.response?.data?.message ||
+                    err.message,
+            );
         } finally {
             setSaving(false);
         }
@@ -137,9 +285,15 @@ const PhilHealthTab = ({ rates, onChanged }) => {
         <div className="flex flex-col gap-5">
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
                 <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
-                    <p className="text-sm font-semibold text-slate-700">PhilHealth Premium Rates</p>
+                    <p className="text-sm font-semibold text-slate-700">
+                        PhilHealth Premium Rates
+                    </p>
                     <button
-                        onClick={() => { setAdding(true); setEditId(null); setForm(emptyPH()); }}
+                        onClick={() => {
+                            setAdding(true);
+                            setEditId(null);
+                            setForm(emptyPH());
+                        }}
                         className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-700"
                     >
                         <FiPlus size={12} /> Add Rate
@@ -147,79 +301,181 @@ const PhilHealthTab = ({ rates, onChanged }) => {
                 </div>
 
                 <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                    <thead>
-                        <tr className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500 border-b border-slate-100">
-                            <th className="px-5 py-2.5 text-left">Year</th>
-                            <th className="px-5 py-2.5 text-right">Premium Rate</th>
-                            <th className="px-5 py-2.5 text-right">EE Share</th>
-                            <th className="px-5 py-2.5 text-right">Min Salary</th>
-                            <th className="px-5 py-2.5 text-right">Ceiling</th>
-                            <th className="px-5 py-2.5 text-right">EE Contribution*</th>
-                            <th className="px-5 py-2.5"></th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {rates.length === 0 && (
-                            <tr><td colSpan={7} className="px-5 py-6 text-center text-slate-400 text-xs">No rates yet.</td></tr>
-                        )}
-                        {rates.map((r) => (
-                            <tr key={r._id} className="hover:bg-slate-50">
-                                <td className="px-5 py-3 font-medium text-slate-800">{r.year}</td>
-                                <td className="px-5 py-3 text-right text-slate-600">{pct(r.premiumRate)}</td>
-                                <td className="px-5 py-3 text-right text-slate-600">{pct(r.employeeShare)}</td>
-                                <td className="px-5 py-3 text-right text-slate-600">{fmt(r.minimumSalaryThreshold)}</td>
-                                <td className="px-5 py-3 text-right text-slate-600">{r.deductionCeiling ? fmt(r.deductionCeiling) : "—"}</td>
-                                <td className="px-5 py-3 text-right font-medium text-slate-800">
-                                    {pct(Number(r.premiumRate) * Number(r.employeeShare))}
-                                </td>
-                                <td className="px-5 py-3">
-                                    <div className="flex items-center gap-2 justify-end">
-                                        <button onClick={() => startEdit(r)} className="text-blue-500 hover:text-blue-700"><FiEdit2 size={13} /></button>
-                                        <button onClick={() => handleDelete(r._id)} className="text-red-400 hover:text-red-600"><FiTrash2 size={13} /></button>
-                                    </div>
-                                </td>
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500 border-b border-slate-100">
+                                <th className="px-5 py-2.5 text-left">Year</th>
+                                <th className="px-5 py-2.5 text-right">
+                                    Premium Rate
+                                </th>
+                                <th className="px-5 py-2.5 text-right">
+                                    EE Share
+                                </th>
+                                <th className="px-5 py-2.5 text-right">
+                                    Min Salary
+                                </th>
+                                <th className="px-5 py-2.5 text-right">
+                                    Ceiling
+                                </th>
+                                <th className="px-5 py-2.5 text-right">
+                                    EE Contribution*
+                                </th>
+                                <th className="px-5 py-2.5"></th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {rates.length === 0 && (
+                                <tr>
+                                    <td
+                                        colSpan={7}
+                                        className="px-5 py-6 text-center text-slate-400 text-xs"
+                                    >
+                                        No rates yet.
+                                    </td>
+                                </tr>
+                            )}
+                            {rates.map((r) => (
+                                <tr key={r._id} className="hover:bg-slate-50">
+                                    <td className="px-5 py-3 font-medium text-slate-800">
+                                        {r.year}
+                                    </td>
+                                    <td className="px-5 py-3 text-right text-slate-600">
+                                        {pct(r.premiumRate)}
+                                    </td>
+                                    <td className="px-5 py-3 text-right text-slate-600">
+                                        {pct(r.employeeShare)}
+                                    </td>
+                                    <td className="px-5 py-3 text-right text-slate-600">
+                                        {fmt(r.minimumSalaryThreshold)}
+                                    </td>
+                                    <td className="px-5 py-3 text-right text-slate-600">
+                                        {r.deductionCeiling
+                                            ? fmt(r.deductionCeiling)
+                                            : "—"}
+                                    </td>
+                                    <td className="px-5 py-3 text-right font-medium text-slate-800">
+                                        {pct(
+                                            Number(r.premiumRate) *
+                                                Number(r.employeeShare),
+                                        )}
+                                    </td>
+                                    <td className="px-5 py-3">
+                                        <div className="flex items-center gap-2 justify-end">
+                                            <button
+                                                onClick={() => startEdit(r)}
+                                                className="text-blue-500 hover:text-blue-700"
+                                            >
+                                                <FiEdit2 size={13} />
+                                            </button>
+                                            <button
+                                                onClick={() =>
+                                                    handleDelete(r._id)
+                                                }
+                                                className="text-red-400 hover:text-red-600"
+                                            >
+                                                <FiTrash2 size={13} />
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
                 <p className="text-[11px] text-slate-400 px-5 py-2 border-t border-slate-100">
-                    * EE Contribution = Premium Rate × EE Share (e.g. 5% × 50% = 2.5% of salary)
+                    * EE Contribution = Premium Rate × EE Share (e.g. 5% × 50% =
+                    2.5% of salary)
                 </p>
             </div>
 
-            <Overlay isOpen={adding || !!editId} onClose={cancel}>
-                <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
-                    <div className="flex items-center justify-between mb-4">
-                        <p className="text-sm font-semibold text-slate-700">{editId ? "Edit Rate" : "Add PhilHealth Rate"}</p>
-                        <button onClick={cancel} className="text-slate-400 hover:text-slate-600"><FiX size={16} /></button>
-                    </div>
-                    <form onSubmit={handleSubmit} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <SettingsModal
+                open={adding || !!editId}
+                onClose={cancel}
+                title={editId ? "Edit PhilHealth Rate" : "Add PhilHealth Rate"}
+                subtitle="One rate per year. Payroll uses the row matching the pay period."
+                onSubmit={handleSubmit}
+                saving={saving}
+                submitLabel={editId ? "Update Rate" : "Add Rate"}
+            >
+                <div>
+                    <SectionHead
+                        title="Premium"
+                        note="The employee pays their share of the premium; the employer pays the rest."
+                    />
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <Field label="Year">
-                            <NumInput name="year" value={form.year} onChange={set("year")} step="1" min="2000" placeholder="2026" />
+                            <NumInput
+                                name="year"
+                                value={form.year}
+                                onChange={set("year")}
+                                step="1"
+                                min="2000"
+                                placeholder="2026"
+                            />
                         </Field>
-                        <Field label="Premium Rate (decimal)">
-                            <NumInput name="premiumRate" value={form.premiumRate} onChange={set("premiumRate")} placeholder="0.05" />
+                        <Field label="Premium Rate">
+                            <PercentInput
+                                name="premiumRate"
+                                value={form.premiumRate}
+                                onChange={set("premiumRate")}
+                                placeholder="5"
+                            />
                         </Field>
-                        <Field label="EE Share (decimal)">
-                            <NumInput name="employeeShare" value={form.employeeShare} onChange={set("employeeShare")} placeholder="0.5" />
+                        <Field label="Employee Share">
+                            <PercentInput
+                                name="employeeShare"
+                                value={form.employeeShare}
+                                onChange={set("employeeShare")}
+                                placeholder="50"
+                            />
                         </Field>
-                        <Field label="Min Salary">
-                            <NumInput name="minimumSalaryThreshold" value={form.minimumSalaryThreshold} onChange={set("minimumSalaryThreshold")} placeholder="10000" step="1" />
+                    </div>
+                </div>
+
+                <div>
+                    <SectionHead
+                        title="Salary bounds"
+                        note="Salary is raised to the minimum and capped at the ceiling before the premium is applied."
+                    />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <Field label="Minimum Salary">
+                            <NumInput
+                                name="minimumSalaryThreshold"
+                                value={form.minimumSalaryThreshold}
+                                onChange={set("minimumSalaryThreshold")}
+                                placeholder="10000"
+                                step="1"
+                                prefix="₱"
+                            />
                         </Field>
                         <Field label="Ceiling (optional)">
-                            <NumInput name="deductionCeiling" value={form.deductionCeiling} onChange={set("deductionCeiling")} placeholder="100000" step="1" />
+                            <NumInput
+                                name="deductionCeiling"
+                                value={form.deductionCeiling}
+                                onChange={set("deductionCeiling")}
+                                placeholder="100000"
+                                step="1"
+                                prefix="₱"
+                            />
                         </Field>
-                        <div className="col-span-full flex gap-2 pt-1">
-                            <button type="button" onClick={cancel} className="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">Cancel</button>
-                            <button type="submit" disabled={saving} className="px-4 py-2 rounded-lg bg-slate-900 text-sm text-white hover:bg-slate-700 disabled:opacity-60">
-                                {saving ? "Saving…" : editId ? "Update" : "Add"}
-                            </button>
-                        </div>
-                    </form>
+                    </div>
                 </div>
-            </Overlay>
+
+                <div className="rounded-lg bg-slate-50 border border-slate-200 px-4 py-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1">
+                        What this deducts
+                    </p>
+                    <p className="text-sm text-slate-700">
+                        {pct(
+                            Number(form.premiumRate || 0) *
+                                Number(form.employeeShare || 0),
+                        )}{" "}
+                        of salary from the employee
+                        {form.minimumSalaryThreshold !== "" &&
+                            ` — ${fmt(Number(form.minimumSalaryThreshold) * Number(form.premiumRate || 0) * Number(form.employeeShare || 0))} a month at the minimum salary`}
+                    </p>
+                </div>
+            </SettingsModal>
             {confirmModal}
         </div>
     );
@@ -236,6 +492,7 @@ const emptyPI = () => ({
     overThresholdEmployerShare: "",
     percentageRateSalaryThreshold: "",
     flatRateMaxDeduction: "",
+    employerMaxContribution: "",
 });
 
 const PagIbigTab = ({ rates, onChanged }) => {
@@ -243,7 +500,8 @@ const PagIbigTab = ({ rates, onChanged }) => {
     const [editId, setEditId] = useState(null);
     const [form, setForm] = useState(emptyPI());
     const [saving, setSaving] = useState(false);
-    const { confirmModal: piConfirmModal, askConfirm: piAskConfirm } = useConfirm();
+    const { confirmModal: piConfirmModal, askConfirm: piAskConfirm } =
+        useConfirm();
 
     const set = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
 
@@ -256,28 +514,41 @@ const PagIbigTab = ({ rates, onChanged }) => {
             basicEmployerShare: r.basicEmployerShare ?? "",
             overThresholdEmployeeShare: r.overThresholdEmployeeShare ?? "",
             overThresholdEmployerShare: r.overThresholdEmployerShare ?? "",
-            percentageRateSalaryThreshold: r.percentageRateSalaryThreshold ?? "",
+            percentageRateSalaryThreshold:
+                r.percentageRateSalaryThreshold ?? "",
             flatRateMaxDeduction: r.flatRateMaxDeduction ?? "",
+            employerMaxContribution: r.employerMaxContribution ?? "",
         });
         setAdding(false);
     };
 
-    const cancel = () => { setAdding(false); setEditId(null); setForm(emptyPI()); };
+    const cancel = () => {
+        setAdding(false);
+        setEditId(null);
+        setForm(emptyPI());
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setSaving(true);
-        const num = (v) => v !== "" ? Number(v) : undefined;
+        const num = (v) => (v !== "" ? Number(v) : undefined);
         try {
             const payload = {
                 year: num(form.year),
                 incomeCeiling: num(form.incomeCeiling),
                 basicEmployeeShare: num(form.basicEmployeeShare),
                 basicEmployerShare: num(form.basicEmployerShare),
-                overThresholdEmployeeShare: num(form.overThresholdEmployeeShare),
-                overThresholdEmployerShare: num(form.overThresholdEmployerShare),
-                percentageRateSalaryThreshold: num(form.percentageRateSalaryThreshold),
+                overThresholdEmployeeShare: num(
+                    form.overThresholdEmployeeShare,
+                ),
+                overThresholdEmployerShare: num(
+                    form.overThresholdEmployerShare,
+                ),
+                percentageRateSalaryThreshold: num(
+                    form.percentageRateSalaryThreshold,
+                ),
                 flatRateMaxDeduction: num(form.flatRateMaxDeduction),
+                employerMaxContribution: num(form.employerMaxContribution),
             };
             if (editId) {
                 await customFetch.patch(`/pagibig-rates/${editId}`, payload);
@@ -289,7 +560,11 @@ const PagIbigTab = ({ rates, onChanged }) => {
             cancel();
             onChanged();
         } catch (err) {
-            toast.error(err?.response?.data?.msg || err?.response?.data?.message || err.message);
+            toast.error(
+                err?.response?.data?.msg ||
+                    err?.response?.data?.message ||
+                    err.message,
+            );
         } finally {
             setSaving(false);
         }
@@ -311,9 +586,15 @@ const PagIbigTab = ({ rates, onChanged }) => {
         <div className="flex flex-col gap-5">
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
                 <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100">
-                    <p className="text-sm font-semibold text-slate-700">Pag-IBIG Contribution Rates</p>
+                    <p className="text-sm font-semibold text-slate-700">
+                        Pag-IBIG Contribution Rates
+                    </p>
                     <button
-                        onClick={() => { setAdding(true); setEditId(null); setForm(emptyPI()); }}
+                        onClick={() => {
+                            setAdding(true);
+                            setEditId(null);
+                            setForm(emptyPI());
+                        }}
                         className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-700"
                     >
                         <FiPlus size={12} /> Add Rate
@@ -321,83 +602,228 @@ const PagIbigTab = ({ rates, onChanged }) => {
                 </div>
 
                 <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                    <thead>
-                        <tr className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500 border-b border-slate-100">
-                            <th className="px-5 py-2.5 text-left">Year</th>
-                            <th className="px-5 py-2.5 text-right">Income Ceiling</th>
-                            <th className="px-5 py-2.5 text-right">EE ≤ Ceiling</th>
-                            <th className="px-5 py-2.5 text-right">EE &gt; Ceiling</th>
-                            <th className="px-5 py-2.5 text-right">Salary Cap</th>
-                            <th className="px-5 py-2.5 text-right">Max Deduction</th>
-                            <th className="px-5 py-2.5"></th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {rates.length === 0 && (
-                            <tr><td colSpan={7} className="px-5 py-6 text-center text-slate-400 text-xs">No rates yet.</td></tr>
-                        )}
-                        {rates.map((r) => (
-                            <tr key={r._id} className="hover:bg-slate-50">
-                                <td className="px-5 py-3 font-medium text-slate-800">{r.year ?? "—"}</td>
-                                <td className="px-5 py-3 text-right text-slate-600">{fmt(r.incomeCeiling)}</td>
-                                <td className="px-5 py-3 text-right text-slate-600">{pct(r.basicEmployeeShare)}</td>
-                                <td className="px-5 py-3 text-right text-slate-600">{pct(r.overThresholdEmployeeShare)}</td>
-                                <td className="px-5 py-3 text-right text-slate-600">{r.percentageRateSalaryThreshold ? fmt(r.percentageRateSalaryThreshold) : "—"}</td>
-                                <td className="px-5 py-3 text-right font-medium text-slate-800">{r.flatRateMaxDeduction ? fmt(r.flatRateMaxDeduction) : "—"}</td>
-                                <td className="px-5 py-3">
-                                    <div className="flex items-center gap-2 justify-end">
-                                        <button onClick={() => startEdit(r)} className="text-blue-500 hover:text-blue-700"><FiEdit2 size={13} /></button>
-                                        <button onClick={() => handleDelete(r._id)} className="text-red-400 hover:text-red-600"><FiTrash2 size={13} /></button>
-                                    </div>
-                                </td>
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500 border-b border-slate-100">
+                                <th className="px-5 py-2.5 text-left">Year</th>
+                                <th className="px-5 py-2.5 text-right">
+                                    Income Ceiling
+                                </th>
+                                <th className="px-5 py-2.5 text-right">
+                                    EE ≤ Ceiling
+                                </th>
+                                <th className="px-5 py-2.5 text-right">
+                                    EE &gt; Ceiling
+                                </th>
+                                <th className="px-5 py-2.5 text-right">
+                                    Salary Cap
+                                </th>
+                                <th className="px-5 py-2.5 text-right">
+                                    Max Deduction
+                                </th>
+                                <th className="px-5 py-2.5"></th>
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {rates.length === 0 && (
+                                <tr>
+                                    <td
+                                        colSpan={7}
+                                        className="px-5 py-6 text-center text-slate-400 text-xs"
+                                    >
+                                        No rates yet.
+                                    </td>
+                                </tr>
+                            )}
+                            {rates.map((r) => (
+                                <tr key={r._id} className="hover:bg-slate-50">
+                                    <td className="px-5 py-3 font-medium text-slate-800">
+                                        {r.year ?? "—"}
+                                    </td>
+                                    <td className="px-5 py-3 text-right text-slate-600">
+                                        {fmt(r.incomeCeiling)}
+                                    </td>
+                                    <td className="px-5 py-3 text-right text-slate-600">
+                                        {pct(r.basicEmployeeShare)}
+                                    </td>
+                                    <td className="px-5 py-3 text-right text-slate-600">
+                                        {pct(r.overThresholdEmployeeShare)}
+                                    </td>
+                                    <td className="px-5 py-3 text-right text-slate-600">
+                                        {r.percentageRateSalaryThreshold
+                                            ? fmt(
+                                                  r.percentageRateSalaryThreshold,
+                                              )
+                                            : "—"}
+                                    </td>
+                                    <td className="px-5 py-3 text-right font-medium text-slate-800">
+                                        {r.flatRateMaxDeduction
+                                            ? fmt(r.flatRateMaxDeduction)
+                                            : "—"}
+                                    </td>
+                                    <td className="px-5 py-3">
+                                        <div className="flex items-center gap-2 justify-end">
+                                            <button
+                                                onClick={() => startEdit(r)}
+                                                className="text-blue-500 hover:text-blue-700"
+                                            >
+                                                <FiEdit2 size={13} />
+                                            </button>
+                                            <button
+                                                onClick={() =>
+                                                    handleDelete(r._id)
+                                                }
+                                                className="text-red-400 hover:text-red-600"
+                                            >
+                                                <FiTrash2 size={13} />
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
-            <Overlay isOpen={adding || !!editId} onClose={cancel}>
-                <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
-                    <div className="flex items-center justify-between mb-4">
-                        <p className="text-sm font-semibold text-slate-700">{editId ? "Edit Rate" : "Add Pag-IBIG Rate"}</p>
-                        <button onClick={cancel} className="text-slate-400 hover:text-slate-600"><FiX size={16} /></button>
-                    </div>
-                    <form onSubmit={handleSubmit} className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            <SettingsModal
+                open={adding || !!editId}
+                onClose={cancel}
+                title={editId ? "Edit Pag-IBIG Rate" : "Add Pag-IBIG Rate"}
+                subtitle="One rate per year. The ceiling decides which pair of shares applies."
+                onSubmit={handleSubmit}
+                saving={saving}
+                submitLabel={editId ? "Update Rate" : "Add Rate"}
+            >
+                <div>
+                    <SectionHead title="Year and ceiling" />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <Field label="Year">
-                            <NumInput name="year" value={form.year} onChange={set("year")} step="1" min="2000" placeholder="2026" />
+                            <NumInput
+                                name="year"
+                                value={form.year}
+                                onChange={set("year")}
+                                step="1"
+                                min="2000"
+                                placeholder="2026"
+                            />
                         </Field>
                         <Field label="Income Ceiling">
-                            <NumInput name="incomeCeiling" value={form.incomeCeiling} onChange={set("incomeCeiling")} placeholder="1500" step="1" />
+                            <NumInput
+                                name="incomeCeiling"
+                                value={form.incomeCeiling}
+                                onChange={set("incomeCeiling")}
+                                placeholder="1500"
+                                step="1"
+                                prefix="₱"
+                            />
                         </Field>
-                        <Field label="EE Share ≤ Ceiling (decimal)">
-                            <NumInput name="basicEmployeeShare" value={form.basicEmployeeShare} onChange={set("basicEmployeeShare")} placeholder="0.01" />
+                    </div>
+                </div>
+
+                <div>
+                    <SectionHead
+                        title="Monthly pay at or below the ceiling"
+                        note="Applied to the whole salary."
+                    />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <Field label="Employee Share">
+                            <PercentInput
+                                name="basicEmployeeShare"
+                                value={form.basicEmployeeShare}
+                                onChange={set("basicEmployeeShare")}
+                                placeholder="1"
+                            />
                         </Field>
-                        <Field label="ER Share ≤ Ceiling (decimal)">
-                            <NumInput name="basicEmployerShare" value={form.basicEmployerShare} onChange={set("basicEmployerShare")} placeholder="0.02" />
+                        <Field label="Employer Share">
+                            <PercentInput
+                                name="basicEmployerShare"
+                                value={form.basicEmployerShare}
+                                onChange={set("basicEmployerShare")}
+                                placeholder="2"
+                            />
                         </Field>
-                        <Field label="EE Share &gt; Ceiling (decimal)">
-                            <NumInput name="overThresholdEmployeeShare" value={form.overThresholdEmployeeShare} onChange={set("overThresholdEmployeeShare")} placeholder="0.02" />
+                    </div>
+                </div>
+
+                <div>
+                    <SectionHead
+                        title="Monthly pay above the ceiling"
+                        note="Applied to the salary, but never to more than the salary cap below."
+                    />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <Field label="Employee Share">
+                            <PercentInput
+                                name="overThresholdEmployeeShare"
+                                value={form.overThresholdEmployeeShare}
+                                onChange={set("overThresholdEmployeeShare")}
+                                placeholder="2"
+                            />
                         </Field>
-                        <Field label="ER Share &gt; Ceiling (decimal)">
-                            <NumInput name="overThresholdEmployerShare" value={form.overThresholdEmployerShare} onChange={set("overThresholdEmployerShare")} placeholder="0.02" />
+                        <Field label="Employer Share">
+                            <PercentInput
+                                name="overThresholdEmployerShare"
+                                value={form.overThresholdEmployerShare}
+                                onChange={set("overThresholdEmployerShare")}
+                                placeholder="2"
+                            />
                         </Field>
                         <Field label="Salary Cap for %">
-                            <NumInput name="percentageRateSalaryThreshold" value={form.percentageRateSalaryThreshold} onChange={set("percentageRateSalaryThreshold")} placeholder="5000" step="1" />
+                            <NumInput
+                                name="percentageRateSalaryThreshold"
+                                value={form.percentageRateSalaryThreshold}
+                                onChange={set("percentageRateSalaryThreshold")}
+                                placeholder="5000"
+                                step="1"
+                                prefix="₱"
+                            />
                         </Field>
-                        <Field label="Max EE Deduction">
-                            <NumInput name="flatRateMaxDeduction" value={form.flatRateMaxDeduction} onChange={set("flatRateMaxDeduction")} placeholder="100" step="1" />
+                        <Field label="Max Employee Deduction">
+                            <NumInput
+                                name="flatRateMaxDeduction"
+                                value={form.flatRateMaxDeduction}
+                                onChange={set("flatRateMaxDeduction")}
+                                placeholder="200"
+                                step="1"
+                                prefix="₱"
+                            />
                         </Field>
-                        <div className="col-span-full flex gap-2 pt-1">
-                            <button type="button" onClick={cancel} className="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">Cancel</button>
-                            <button type="submit" disabled={saving} className="px-4 py-2 rounded-lg bg-slate-900 text-sm text-white hover:bg-slate-700 disabled:opacity-60">
-                                {saving ? "Saving…" : editId ? "Update" : "Add"}
-                            </button>
-                        </div>
-                    </form>
+                        <Field label="Max Employer Contribution">
+                            <NumInput
+                                name="employerMaxContribution"
+                                value={form.employerMaxContribution}
+                                onChange={set("employerMaxContribution")}
+                                placeholder="200"
+                                step="1"
+                                prefix="₱"
+                            />
+                        </Field>
+                    </div>
                 </div>
-            </Overlay>
+
+                <div className="rounded-lg bg-slate-50 border border-slate-200 px-4 py-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1">
+                        What this deducts
+                    </p>
+                    <p className="text-sm text-slate-700">
+                        Above the ceiling:{" "}
+                        {fmt(
+                            Math.min(
+                                Number(
+                                    form.percentageRateSalaryThreshold || 0,
+                                ) *
+                                    Number(
+                                        form.overThresholdEmployeeShare || 0,
+                                    ),
+                                Number(form.flatRateMaxDeduction) ||
+                                    Number.POSITIVE_INFINITY,
+                            ),
+                        )}{" "}
+                        a month from the employee
+                        {Number(form.flatRateMaxDeduction) > 0 && " (capped)"}
+                    </p>
+                </div>
+            </SettingsModal>
             {piConfirmModal}
         </div>
     );
@@ -422,14 +848,29 @@ const emptySSS = (year) => ({
 
 const SSSTab = ({ rates, onChanged }) => {
     const years = [...new Set(rates.map((r) => r.year))].sort((a, b) => b - a);
-    const [filterYear, setFilterYear] = useState(years[0] ?? new Date().getFullYear());
+    const [filterYear, setFilterYear] = useState(
+        years[0] ?? new Date().getFullYear(),
+    );
     const [adding, setAdding] = useState(false);
     const [editId, setEditId] = useState(null);
     const [form, setForm] = useState(emptySSS(filterYear));
     const [saving, setSaving] = useState(false);
-    const { confirmModal: sssConfirmModal, askConfirm: sssAskConfirm } = useConfirm();
+    const { confirmModal: sssConfirmModal, askConfirm: sssAskConfirm } =
+        useConfirm();
 
     const set = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
+
+    // The three totals are arithmetic on the fields above them, and the
+    // employee total is what payroll actually deducts. Typing them by hand
+    // invited a bracket whose parts and total disagreed, so they are derived
+    // here and shown read-only.
+    const n = (v) => Number(v) || 0;
+    const r2 = (v) => Math.round(v * 100) / 100;
+    const eeTotal = r2(n(form.employeeShare) + n(form.employeeMPF));
+    const erTotal = r2(
+        n(form.employerShare) + n(form.employerEC) + n(form.employerMPF),
+    );
+    const grandTotal = r2(eeTotal + erTotal);
 
     const filtered = rates.filter((r) => r.year === Number(filterYear));
 
@@ -452,12 +893,16 @@ const SSSTab = ({ rates, onChanged }) => {
         setAdding(false);
     };
 
-    const cancel = () => { setAdding(false); setEditId(null); setForm(emptySSS(filterYear)); };
+    const cancel = () => {
+        setAdding(false);
+        setEditId(null);
+        setForm(emptySSS(filterYear));
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setSaving(true);
-        const num = (v) => v !== "" ? Number(v) : null;
+        const num = (v) => (v !== "" ? Number(v) : null);
         try {
             const payload = {
                 year: Number(form.year),
@@ -465,9 +910,9 @@ const SSSTab = ({ rates, onChanged }) => {
                 employeeShare: Number(form.employeeShare),
                 employerShare: Number(form.employerShare),
                 employerEC: Number(form.employerEC),
-                totalEmployeeContribution: Number(form.totalEmployeeContribution),
-                totalEmployerContribution: Number(form.totalEmployerContribution),
-                totalContribution: Number(form.totalContribution),
+                totalEmployeeContribution: eeTotal,
+                totalEmployerContribution: erTotal,
+                totalContribution: grandTotal,
                 compensationFrom: num(form.compensationFrom),
                 compensationTo: num(form.compensationTo),
                 employeeMPF: num(form.employeeMPF) ?? 0,
@@ -484,7 +929,11 @@ const SSSTab = ({ rates, onChanged }) => {
             cancel();
             onChanged();
         } catch (err) {
-            toast.error(err?.response?.data?.msg || err?.response?.data?.message || err.message);
+            toast.error(
+                err?.response?.data?.msg ||
+                    err?.response?.data?.message ||
+                    err.message,
+            );
         } finally {
             setSaving(false);
         }
@@ -507,19 +956,35 @@ const SSSTab = ({ rates, onChanged }) => {
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
                 <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 flex-wrap gap-3">
                     <div className="flex items-center gap-3">
-                        <p className="text-sm font-semibold text-slate-700">SSS Contribution Table</p>
+                        <p className="text-sm font-semibold text-slate-700">
+                            SSS Contribution Table
+                        </p>
                         <select
                             value={filterYear}
                             onChange={(e) => setFilterYear(e.target.value)}
                             className="border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs text-slate-700 bg-slate-50 outline-none"
                         >
-                            {years.length === 0 && <option value={new Date().getFullYear()}>{new Date().getFullYear()}</option>}
-                            {years.map((y) => <option key={y} value={y}>{y}</option>)}
+                            {years.length === 0 && (
+                                <option value={new Date().getFullYear()}>
+                                    {new Date().getFullYear()}
+                                </option>
+                            )}
+                            {years.map((y) => (
+                                <option key={y} value={y}>
+                                    {y}
+                                </option>
+                            ))}
                         </select>
-                        <span className="text-xs text-slate-400">{filtered.length} brackets</span>
+                        <span className="text-xs text-slate-400">
+                            {filtered.length} brackets
+                        </span>
                     </div>
                     <button
-                        onClick={() => { setAdding(true); setEditId(null); setForm(emptySSS(filterYear)); }}
+                        onClick={() => {
+                            setAdding(true);
+                            setEditId(null);
+                            setForm(emptySSS(filterYear));
+                        }}
                         className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-slate-900 text-white hover:bg-slate-700"
                     >
                         <FiPlus size={12} /> Add Bracket
@@ -530,41 +995,106 @@ const SSSTab = ({ rates, onChanged }) => {
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="bg-slate-50 text-xs uppercase tracking-wider text-slate-500 border-b border-slate-100">
-                                <th className="px-4 py-2.5 text-left">Comp. Range</th>
+                                <th className="px-4 py-2.5 text-left">
+                                    Comp. Range
+                                </th>
                                 <th className="px-4 py-2.5 text-right">MSC</th>
-                                <th className="px-4 py-2.5 text-right">EE Share</th>
-                                <th className="px-4 py-2.5 text-right">EE MPF</th>
-                                <th className="px-4 py-2.5 text-right">Total EE</th>
-                                <th className="px-4 py-2.5 text-right">ER Share</th>
-                                <th className="px-4 py-2.5 text-right">ER EC</th>
-                                <th className="px-4 py-2.5 text-right">ER MPF</th>
-                                <th className="px-4 py-2.5 text-right">Total ER</th>
-                                <th className="px-4 py-2.5 text-right">Grand Total</th>
+                                <th className="px-4 py-2.5 text-right">
+                                    EE Share
+                                </th>
+                                <th className="px-4 py-2.5 text-right">
+                                    EE MPF
+                                </th>
+                                <th className="px-4 py-2.5 text-right">
+                                    Total EE
+                                </th>
+                                <th className="px-4 py-2.5 text-right">
+                                    ER Share
+                                </th>
+                                <th className="px-4 py-2.5 text-right">
+                                    ER EC
+                                </th>
+                                <th className="px-4 py-2.5 text-right">
+                                    ER MPF
+                                </th>
+                                <th className="px-4 py-2.5 text-right">
+                                    Total ER
+                                </th>
+                                <th className="px-4 py-2.5 text-right">
+                                    Grand Total
+                                </th>
                                 <th className="px-4 py-2.5"></th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                             {filtered.length === 0 && (
-                                <tr><td colSpan={11} className="px-4 py-6 text-center text-slate-400 text-xs">No brackets for this year yet.</td></tr>
+                                <tr>
+                                    <td
+                                        colSpan={11}
+                                        className="px-4 py-6 text-center text-slate-400 text-xs"
+                                    >
+                                        No brackets for this year yet.
+                                    </td>
+                                </tr>
                             )}
                             {filtered.map((r) => (
                                 <tr key={r._id} className="hover:bg-slate-50">
                                     <td className="px-4 py-2.5 text-slate-700 whitespace-nowrap">
-                                        {r.compensationFrom != null ? fmt(r.compensationFrom) : "Below"} – {r.compensationTo != null ? fmt(r.compensationTo) : "Above"}
+                                        {r.compensationFrom != null
+                                            ? fmt(r.compensationFrom)
+                                            : "Below"}{" "}
+                                        –{" "}
+                                        {r.compensationTo != null
+                                            ? fmt(r.compensationTo)
+                                            : "Above"}
                                     </td>
-                                    <td className="px-4 py-2.5 text-right text-slate-700">{fmt(r.msc)}</td>
-                                    <td className="px-4 py-2.5 text-right text-slate-600">{fmt(r.employeeShare)}</td>
-                                    <td className="px-4 py-2.5 text-right text-slate-600">{r.employeeMPF ? fmt(r.employeeMPF) : "—"}</td>
-                                    <td className="px-4 py-2.5 text-right font-medium text-slate-800">{fmt(r.totalEmployeeContribution)}</td>
-                                    <td className="px-4 py-2.5 text-right text-slate-600">{fmt(r.employerShare)}</td>
-                                    <td className="px-4 py-2.5 text-right text-slate-600">{fmt(r.employerEC)}</td>
-                                    <td className="px-4 py-2.5 text-right text-slate-600">{r.employerMPF ? fmt(r.employerMPF) : "—"}</td>
-                                    <td className="px-4 py-2.5 text-right text-slate-600">{fmt(r.totalEmployerContribution)}</td>
-                                    <td className="px-4 py-2.5 text-right font-medium text-slate-800">{fmt(r.totalContribution)}</td>
+                                    <td className="px-4 py-2.5 text-right text-slate-700">
+                                        {fmt(r.msc)}
+                                    </td>
+                                    <td className="px-4 py-2.5 text-right text-slate-600">
+                                        {fmt(r.employeeShare)}
+                                    </td>
+                                    <td className="px-4 py-2.5 text-right text-slate-600">
+                                        {r.employeeMPF
+                                            ? fmt(r.employeeMPF)
+                                            : "—"}
+                                    </td>
+                                    <td className="px-4 py-2.5 text-right font-medium text-slate-800">
+                                        {fmt(r.totalEmployeeContribution)}
+                                    </td>
+                                    <td className="px-4 py-2.5 text-right text-slate-600">
+                                        {fmt(r.employerShare)}
+                                    </td>
+                                    <td className="px-4 py-2.5 text-right text-slate-600">
+                                        {fmt(r.employerEC)}
+                                    </td>
+                                    <td className="px-4 py-2.5 text-right text-slate-600">
+                                        {r.employerMPF
+                                            ? fmt(r.employerMPF)
+                                            : "—"}
+                                    </td>
+                                    <td className="px-4 py-2.5 text-right text-slate-600">
+                                        {fmt(r.totalEmployerContribution)}
+                                    </td>
+                                    <td className="px-4 py-2.5 text-right font-medium text-slate-800">
+                                        {fmt(r.totalContribution)}
+                                    </td>
                                     <td className="px-4 py-2.5">
                                         <div className="flex items-center gap-2 justify-end">
-                                            <button onClick={() => startEdit(r)} className="text-blue-500 hover:text-blue-700"><FiEdit2 size={13} /></button>
-                                            <button onClick={() => handleDelete(r._id)} className="text-red-400 hover:text-red-600"><FiTrash2 size={13} /></button>
+                                            <button
+                                                onClick={() => startEdit(r)}
+                                                className="text-blue-500 hover:text-blue-700"
+                                            >
+                                                <FiEdit2 size={13} />
+                                            </button>
+                                            <button
+                                                onClick={() =>
+                                                    handleDelete(r._id)
+                                                }
+                                                className="text-red-400 hover:text-red-600"
+                                            >
+                                                <FiTrash2 size={13} />
+                                            </button>
                                         </div>
                                     </td>
                                 </tr>
@@ -574,74 +1104,144 @@ const SSSTab = ({ rates, onChanged }) => {
                 </div>
             </div>
 
-            <Overlay isOpen={adding || !!editId} onClose={cancel}>
-                <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
-                    <div className="flex items-center justify-between mb-4">
-                        <p className="text-sm font-semibold text-slate-700">{editId ? "Edit SSS Bracket" : "Add SSS Bracket"}</p>
-                        <button onClick={cancel} className="text-slate-400 hover:text-slate-600"><FiX size={16} /></button>
+            <SettingsModal
+                open={adding || !!editId}
+                onClose={cancel}
+                title={editId ? "Edit SSS Bracket" : "Add SSS Bracket"}
+                subtitle="One bracket of the contribution table. Totals are worked out from the parts."
+                onSubmit={handleSubmit}
+                saving={saving}
+                submitLabel={editId ? "Update Bracket" : "Add Bracket"}
+            >
+                <div>
+                    <SectionHead
+                        title="Bracket"
+                        note="Leave a bound blank for an open-ended first or last row."
+                    />
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <Field label="Year">
+                            <NumInput
+                                name="year"
+                                value={form.year}
+                                onChange={set("year")}
+                                step="1"
+                                min="2000"
+                            />
+                        </Field>
+                        <Field label="Comp. From">
+                            <NumInput
+                                name="compensationFrom"
+                                value={form.compensationFrom}
+                                onChange={set("compensationFrom")}
+                                placeholder="blank = no floor"
+                                step="0.01"
+                                prefix="₱"
+                            />
+                        </Field>
+                        <Field label="Comp. To">
+                            <NumInput
+                                name="compensationTo"
+                                value={form.compensationTo}
+                                onChange={set("compensationTo")}
+                                placeholder="blank = no cap"
+                                step="0.01"
+                                prefix="₱"
+                            />
+                        </Field>
+                        <Field label="MSC">
+                            <NumInput
+                                name="msc"
+                                value={form.msc}
+                                onChange={set("msc")}
+                                placeholder="4000"
+                                step="0.01"
+                                prefix="₱"
+                            />
+                        </Field>
                     </div>
-                    <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-                        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                            <Field label="Year">
-                                <NumInput name="year" value={form.year} onChange={set("year")} step="1" min="2000" />
-                            </Field>
-                            <Field label="Comp. From (blank = none)">
-                                <NumInput name="compensationFrom" value={form.compensationFrom} onChange={set("compensationFrom")} placeholder="blank = first row" step="0.01" />
-                            </Field>
-                            <Field label="Comp. To (blank = none)">
-                                <NumInput name="compensationTo" value={form.compensationTo} onChange={set("compensationTo")} placeholder="blank = last row" step="0.01" />
-                            </Field>
-                            <Field label="MSC">
-                                <NumInput name="msc" value={form.msc} onChange={set("msc")} placeholder="4000" step="0.01" />
-                            </Field>
-                        </div>
-                        <div className="border-t border-slate-100 pt-3">
-                            <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Employee</p>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                                <Field label="EE Share (SS)">
-                                    <NumInput name="employeeShare" value={form.employeeShare} onChange={set("employeeShare")} placeholder="200.00" />
-                                </Field>
-                                <Field label="EE MPF">
-                                    <NumInput name="employeeMPF" value={form.employeeMPF} onChange={set("employeeMPF")} placeholder="0.00" />
-                                </Field>
-                                <Field label="Total EE Contribution">
-                                    <NumInput name="totalEmployeeContribution" value={form.totalEmployeeContribution} onChange={set("totalEmployeeContribution")} placeholder="200.00" />
-                                </Field>
-                            </div>
-                        </div>
-                        <div className="border-t border-slate-100 pt-3">
-                            <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-2">Employer</p>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                                <Field label="ER Share (SS)">
-                                    <NumInput name="employerShare" value={form.employerShare} onChange={set("employerShare")} placeholder="380.00" />
-                                </Field>
-                                <Field label="ER EC">
-                                    <NumInput name="employerEC" value={form.employerEC} onChange={set("employerEC")} placeholder="10.00" />
-                                </Field>
-                                <Field label="ER MPF">
-                                    <NumInput name="employerMPF" value={form.employerMPF} onChange={set("employerMPF")} placeholder="0.00" />
-                                </Field>
-                                <Field label="Total ER Contribution">
-                                    <NumInput name="totalEmployerContribution" value={form.totalEmployerContribution} onChange={set("totalEmployerContribution")} placeholder="390.00" />
-                                </Field>
-                            </div>
-                        </div>
-                        <div className="border-t border-slate-100 pt-3">
-                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-                                <Field label="Grand Total">
-                                    <NumInput name="totalContribution" value={form.totalContribution} onChange={set("totalContribution")} placeholder="590.00" />
-                                </Field>
-                            </div>
-                        </div>
-                        <div className="flex gap-2 pt-1">
-                            <button type="button" onClick={cancel} className="px-4 py-2 rounded-lg border border-slate-200 text-sm text-slate-600 hover:bg-slate-50">Cancel</button>
-                            <button type="submit" disabled={saving} className="px-4 py-2 rounded-lg bg-slate-900 text-sm text-white hover:bg-slate-700 disabled:opacity-60">
-                                {saving ? "Saving…" : editId ? "Update" : "Add Bracket"}
-                            </button>
-                        </div>
-                    </form>
                 </div>
-            </Overlay>
+
+                <div>
+                    <SectionHead title="Employee" />
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        <Field label="Share (SS)">
+                            <NumInput
+                                name="employeeShare"
+                                value={form.employeeShare}
+                                onChange={set("employeeShare")}
+                                placeholder="200.00"
+                                prefix="₱"
+                            />
+                        </Field>
+                        <Field label="MPF">
+                            <NumInput
+                                name="employeeMPF"
+                                value={form.employeeMPF}
+                                onChange={set("employeeMPF")}
+                                placeholder="0.00"
+                                prefix="₱"
+                            />
+                        </Field>
+                        <ComputedField
+                            label="Total Employee"
+                            value={eeTotal}
+                            hint="Share + MPF"
+                        />
+                    </div>
+                </div>
+
+                <div>
+                    <SectionHead title="Employer" />
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                        <Field label="Share (SS)">
+                            <NumInput
+                                name="employerShare"
+                                value={form.employerShare}
+                                onChange={set("employerShare")}
+                                placeholder="380.00"
+                                prefix="₱"
+                            />
+                        </Field>
+                        <Field label="EC">
+                            <NumInput
+                                name="employerEC"
+                                value={form.employerEC}
+                                onChange={set("employerEC")}
+                                placeholder="10.00"
+                                prefix="₱"
+                            />
+                        </Field>
+                        <Field label="MPF">
+                            <NumInput
+                                name="employerMPF"
+                                value={form.employerMPF}
+                                onChange={set("employerMPF")}
+                                placeholder="0.00"
+                                prefix="₱"
+                            />
+                        </Field>
+                        <ComputedField
+                            label="Total Employer"
+                            value={erTotal}
+                            hint="Share + EC + MPF"
+                        />
+                    </div>
+                </div>
+
+                <div className="rounded-lg bg-slate-50 border border-slate-200 px-4 py-3 flex items-center justify-between">
+                    <div>
+                        <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
+                            Grand Total
+                        </p>
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                            Employee {fmt(eeTotal)} + employer {fmt(erTotal)}
+                        </p>
+                    </div>
+                    <p className="text-lg font-semibold text-slate-800 tabular-nums">
+                        {fmt(grandTotal)}
+                    </p>
+                </div>
+            </SettingsModal>
             {sssConfirmModal}
         </div>
     );
@@ -666,7 +1266,9 @@ const Settings = () => {
         <div>
             <div className="mb-6">
                 <h1 className="text-2xl font-bold text-slate-800">Settings</h1>
-                <p className="text-slate-500 mt-1">Manage government contribution rate tables.</p>
+                <p className="text-slate-500 mt-1">
+                    Manage government contribution rate tables.
+                </p>
             </div>
 
             {/* Tab bar */}
@@ -686,8 +1288,12 @@ const Settings = () => {
                 ))}
             </div>
 
-            {tab === "philhealth" && <PhilHealthTab rates={philHealthRates} onChanged={refresh} />}
-            {tab === "pagibig" && <PagIbigTab rates={pagIbigRates} onChanged={refresh} />}
+            {tab === "philhealth" && (
+                <PhilHealthTab rates={philHealthRates} onChanged={refresh} />
+            )}
+            {tab === "pagibig" && (
+                <PagIbigTab rates={pagIbigRates} onChanged={refresh} />
+            )}
             {tab === "sss" && <SSSTab rates={sssRates} onChanged={refresh} />}
         </div>
     );
