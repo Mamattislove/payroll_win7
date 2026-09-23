@@ -594,26 +594,30 @@ async function generatePayrollFor(
         excludedFromPayroll: { $ne: true },
     };
 
-    // A charge may name the cutoff it belongs to. One dated after this period
-    // is left standing for a later run, so it can be keyed in early without
+    // A standing record may name the cutoff it belongs to. One dated after
+    // this period is left for a later run, so it can be keyed in early without
     // landing on the wrong payslip. Anything dated on or before the period end
-    // is collected -- including a charge dated to a cutoff already run, which
-    // would otherwise be stranded with no payroll left to claim it. A charge
+    // is collected -- including a record dated to a cutoff already run, which
+    // would otherwise be stranded with no payroll left to claim it. A record
     // with no date keeps the original behaviour of going on the next run.
-    const chargeUnlinked = {
+    const dueBy = (dateField) => ({
         ...unlinked,
         $or: [
-            { chargeDate: null },
-            { chargeDate: { $exists: false } },
-            { chargeDate: { $lte: utcDayEnd(payrollTo) } },
+            { [dateField]: null },
+            { [dateField]: { $exists: false } },
+            { [dateField]: { $lte: utcDayEnd(payrollTo) } },
         ],
-    };
+    });
 
     // Auto-attach all unlinked standing records for this employee
     await Promise.all([
-        EarningRecord.updateMany(unlinked, { payroll: payroll._id }),
-        AllowanceRecord.updateMany(unlinked, { payroll: payroll._id }),
-        ChargeRecord.updateMany(chargeUnlinked, { payroll: payroll._id }),
+        EarningRecord.updateMany(dueBy("earningDate"), {
+            payroll: payroll._id,
+        }),
+        AllowanceRecord.updateMany(dueBy("allowanceDate"), {
+            payroll: payroll._id,
+        }),
+        ChargeRecord.updateMany(dueBy("chargeDate"), { payroll: payroll._id }),
     ]);
 
     if (autoDeductDeductions) {

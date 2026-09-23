@@ -10,6 +10,10 @@ import {
 const sharedOptionalFields = [
     body("name").optional().isString().withMessage("name must be a string"),
     body("amount").optional().isNumeric().withMessage("amount must be a number"),
+    body("allowanceDate")
+        .optional({ values: "falsy" })
+        .isISO8601()
+        .withMessage("allowance date must be a valid date"),
 ];
 
 export const validateAllowanceRecordInput = withValidationErrors([
