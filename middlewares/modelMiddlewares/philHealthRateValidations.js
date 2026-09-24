@@ -15,8 +15,6 @@ export const validatePhilHealthRateInput = withValidationErrors([
     body("employeeShare").notEmpty().withMessage("employee share is required").isNumeric().withMessage("employee share must be a number"),
     body("minimumSalaryThreshold").notEmpty().withMessage("minimum salary threshold is required").isNumeric().withMessage("must be a number"),
     body("deductionCeiling").notEmpty().withMessage("deduction ceiling is required").isNumeric().withMessage("deduction ceiling must be a number"),
-    body("minimumPremium").notEmpty().withMessage("minimum premium is required").isNumeric().withMessage("minimum premium must be a number"),
-    body("maximumPremium").notEmpty().withMessage("maximum premium is required").isNumeric().withMessage("maximum premium must be a number"),
 ]);
 
 export const validatePhilHealthRateUpdateInput = withValidationErrors([
@@ -30,8 +28,6 @@ export const validatePhilHealthRateUpdateInput = withValidationErrors([
     body("employeeShare").optional().isNumeric().withMessage("employee share must be a number"),
     body("minimumSalaryThreshold").optional().isNumeric().withMessage("must be a number"),
     body("deductionCeiling").optional().isNumeric().withMessage("deduction ceiling must be a number"),
-    body("minimumPremium").optional().isNumeric().withMessage("minimum premium must be a number"),
-    body("maximumPremium").optional().isNumeric().withMessage("maximum premium must be a number"),
 ]);
 
 export const validatePhilHealthRateParamId = async (req, res, next) => {

@@ -105,64 +105,46 @@ function sssBrackets() {
 // PhilHealth Circular 2019-0009. The premium climbed a half point a year to 5%
 // and the salary ceiling ten thousand a year to 100,000; both have held there
 // since 2024. The floor is 10,000 throughout.
-// The minimum and maximum premium are the circular's "Monthly Premium" column,
-// the total for employee and employer together.
 const PHILHEALTH_RATES = [
     {
         year: 2019,
         premiumRate: 0.0275,
         deductionCeiling: 50000,
-        minimumPremium: 275,
-        maximumPremium: 1375,
     },
     {
         year: 2020,
         premiumRate: 0.03,
         deductionCeiling: 60000,
-        minimumPremium: 300,
-        maximumPremium: 1800,
     },
     {
         year: 2021,
         premiumRate: 0.035,
         deductionCeiling: 70000,
-        minimumPremium: 350,
-        maximumPremium: 2450,
     },
     {
         year: 2022,
         premiumRate: 0.04,
         deductionCeiling: 80000,
-        minimumPremium: 400,
-        maximumPremium: 3200,
     },
     {
         year: 2023,
         premiumRate: 0.045,
         deductionCeiling: 90000,
-        minimumPremium: 450,
-        maximumPremium: 4050,
     },
     {
         year: 2024,
         premiumRate: 0.05,
         deductionCeiling: 100000,
-        minimumPremium: 500,
-        maximumPremium: 5000,
     },
     {
         year: 2025,
         premiumRate: 0.05,
         deductionCeiling: 100000,
-        minimumPremium: 500,
-        maximumPremium: 5000,
     },
     {
         year: 2026,
         premiumRate: 0.05,
         deductionCeiling: 100000,
-        minimumPremium: 500,
-        maximumPremium: 5000,
     },
 ].map((r) => ({
     employeeShare: 0.5, // the premium is split evenly

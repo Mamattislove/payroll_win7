@@ -159,8 +159,7 @@ async function getPhilHealthContributions(wage, year) {
  * share of the month (half a semi-monthly month, a quarter of a weekly one --
  * contributionFactor). PhilHealth deducts the whole share on every run (see
  * philhealthPerRun): the salary held between the floor and ceiling, times the
- * rate, held between the minimum and maximum premium, split by the employee
- * share -- all from the rate table.
+ * rate, split by the employee share -- all from the rate table.
  *
  * `payrollId` is the run being priced when it already exists, so it is not
  * counted as one of its own earlier runs.
@@ -222,6 +221,7 @@ export async function computeContributionsForRun(
         erKey,
         lookup,
         monthToDate,
+        perRun,
     }) => {
         const basis = compensation[basisKey] || SSS_CONTRIBUTION_BASIS.BASIC_PAY;
         if (basis === SSS_CONTRIBUTION_BASIS.NO_DEDUCTION)
@@ -239,10 +239,10 @@ export async function computeContributionsForRun(
                 bracketWage(basis, compensation, periodGross, periodBasic),
                 year,
             );
-            // PhilHealth's per-run split is shared with the Settings calculator
+            // PhilHealth's per-run rule is shared with the Settings calculator
             // (see philhealthPerRun).
-            if (month.minimumPremium != null) {
-                const { employee, employer } = philhealthPerRun(
+            if (perRun) {
+                const { employee, employer } = perRun(
                     month,
                     compensation.payrollPeriod,
                     factor,
@@ -293,6 +293,7 @@ export async function computeContributionsForRun(
             erKey: "philhealthEmployerContribution",
             lookup: getPhilHealthContributions,
             monthToDate: false,
+            perRun: philhealthPerRun,
         }),
         forRun({
             basisKey: "pagibigContributionBasis",

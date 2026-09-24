@@ -16,12 +16,11 @@ export const PHILHEALTH_DEFAULT_CEILING = 100000;
  * The monthly premium for a monthly basic salary.
  *
  *   1. The salary is held between the floor and ceiling (10,000 - 100,000).
- *   2. The premium is that times the rate (5%), held between the minimum and
- *      maximum premium (500 - 5,000).
+ *   2. The premium is that times the rate (5%) -- which the salary bounds
+ *      already keep between 500 and 5,000.
  *   3. It is split by the employee share (0.5, an even split).
  *
- * Every figure comes from `rate`; a row saved before the minimum and maximum
- * premium were recorded falls back to what the salary bounds give at its rate.
+ * Every figure comes from `rate`.
  */
 export function philhealthMonthly(rate, monthlySalary) {
     const {
@@ -29,28 +28,19 @@ export function philhealthMonthly(rate, monthlySalary) {
         employeeShare,
         minimumSalaryThreshold,
         deductionCeiling,
-        minimumPremium,
-        maximumPremium,
     } = rate;
 
     const floor = minimumSalaryThreshold || PHILHEALTH_DEFAULT_FLOOR;
     const ceiling = deductionCeiling || PHILHEALTH_DEFAULT_CEILING;
     const base = Math.min(Math.max(monthlySalary, floor), ceiling);
 
-    const minPremium = minimumPremium || floor * premiumRate;
-    const maxPremium = maximumPremium || ceiling * premiumRate;
-    const premium = Math.min(
-        Math.max(base * premiumRate, minPremium),
-        maxPremium,
-    );
+    const premium = base * premiumRate;
 
     return {
         base: r2(base),
         premium: r2(premium),
         employee: r2(premium * employeeShare),
         employer: r2(premium * (1 - employeeShare)),
-        minimumPremium: minPremium,
-        maximumPremium: maxPremium,
     };
 }
 

@@ -9,8 +9,8 @@ import mongoose from "mongoose";
 //   100,000 and above        100,000 x 5%  = 5,000  (ceiling)
 //
 // The premium is shared by employee and employer, so the employee's deduction
-// is half of it: 250 to 2,500 a month. The 500 and 5,000 are stored as
-// minimumPremium and maximumPremium.
+// is half of it: 250 to 2,500 a month. The 500 and 5,000 need no fields of
+// their own: they are the floor and ceiling times the rate.
 const philHealthRateSchema = new mongoose.Schema(
     {
         year: { type: Number, required: true, unique: true },
@@ -24,13 +24,6 @@ const philHealthRateSchema = new mongoose.Schema(
         // Every year of the schedule has one, and without it the premium runs
         // on the whole salary with no cap.
         deductionCeiling: { type: Number, required: true },
-        // The schedule's "Monthly Premium" column: the lowest and highest total
-        // premium (employee and employer together) for a month -- 500 and
-        // 5,000 for 2024-2025. They follow from the salary bounds at today's
-        // rate, but they are stated in the circular in their own right and are
-        // kept here so a year that sets them differently can be entered as is.
-        minimumPremium: { type: Number, required: true },
-        maximumPremium: { type: Number, required: true },
     },
     { timestamps: true },
 );

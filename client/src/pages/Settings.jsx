@@ -252,8 +252,6 @@ const PhilHealthCalculator = ({ rates }) => {
     else if (monthly && amount > monthly.base)
         boundNote = `Above the ${fmt(monthly.base)} salary ceiling, so it is computed on the ceiling.`;
 
-    const raw = monthly ? monthly.base * rate.premiumRate : 0;
-
     return (
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
             <div className="px-5 py-3 border-b border-slate-100">
@@ -368,9 +366,8 @@ const PhilHealthCalculator = ({ rates }) => {
 
                         <div className="rounded-lg bg-slate-50 border border-slate-200 px-4 py-3 text-sm text-slate-600 flex flex-col gap-1">
                             <p>
-                                {fmt(monthly.base)} × {pct(rate.premiumRate)} = {fmt(raw)}
-                                {Math.abs(raw - monthly.premium) > 0.004 &&
-                                    ` → held at ${fmt(monthly.premium)} (premium range ${fmt(monthly.minimumPremium)} – ${fmt(monthly.maximumPremium)})`}
+                                {fmt(monthly.base)} × {pct(rate.premiumRate)} ={" "}
+                                {fmt(monthly.premium)}
                             </p>
                             {boundNote && <p>{boundNote}</p>}
                             {employed ? (
@@ -404,8 +401,6 @@ const emptyPH = () => ({
     employeeShare: "",
     minimumSalaryThreshold: "",
     deductionCeiling: "",
-    minimumPremium: "",
-    maximumPremium: "",
 });
 
 const PhilHealthTab = ({ rates, onChanged }) => {
@@ -425,8 +420,6 @@ const PhilHealthTab = ({ rates, onChanged }) => {
             employeeShare: r.employeeShare,
             minimumSalaryThreshold: r.minimumSalaryThreshold,
             deductionCeiling: r.deductionCeiling ?? "",
-            minimumPremium: r.minimumPremium ?? "",
-            maximumPremium: r.maximumPremium ?? "",
         });
         setAdding(false);
     };
@@ -448,12 +441,6 @@ const PhilHealthTab = ({ rates, onChanged }) => {
                 minimumSalaryThreshold: Number(form.minimumSalaryThreshold),
                 ...(form.deductionCeiling !== "" && {
                     deductionCeiling: Number(form.deductionCeiling),
-                }),
-                ...(form.minimumPremium !== "" && {
-                    minimumPremium: Number(form.minimumPremium),
-                }),
-                ...(form.maximumPremium !== "" && {
-                    maximumPremium: Number(form.maximumPremium),
                 }),
             };
             if (editId) {
@@ -525,9 +512,6 @@ const PhilHealthTab = ({ rates, onChanged }) => {
                                     Ceiling
                                 </th>
                                 <th className="px-5 py-2.5 text-right">
-                                    Monthly Premium
-                                </th>
-                                <th className="px-5 py-2.5 text-right">
                                     EE Contribution*
                                 </th>
                                 <th className="px-5 py-2.5"></th>
@@ -537,7 +521,7 @@ const PhilHealthTab = ({ rates, onChanged }) => {
                             {rates.length === 0 && (
                                 <tr>
                                     <td
-                                        colSpan={8}
+                                        colSpan={7}
                                         className="px-5 py-6 text-center text-slate-400 text-xs"
                                     >
                                         No rates yet.
@@ -561,11 +545,6 @@ const PhilHealthTab = ({ rates, onChanged }) => {
                                     <td className="px-5 py-3 text-right text-slate-600">
                                         {r.deductionCeiling
                                             ? fmt(r.deductionCeiling)
-                                            : "—"}
-                                    </td>
-                                    <td className="px-5 py-3 text-right text-slate-600 whitespace-nowrap">
-                                        {r.minimumPremium && r.maximumPremium
-                                            ? `${fmt(r.minimumPremium)} – ${fmt(r.maximumPremium)}`
                                             : "—"}
                                     </td>
                                     <td className="px-5 py-3 text-right font-medium text-slate-800">
@@ -678,33 +657,6 @@ const PhilHealthTab = ({ rates, onChanged }) => {
                     </div>
                 </div>
 
-                <div>
-                    <SectionHead
-                        title="Monthly premium"
-                        note="Total premium for employee and employer together. It never goes below the minimum or above the maximum."
-                    />
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <Field label="Minimum Premium">
-                            <NumInput
-                                name="minimumPremium"
-                                value={form.minimumPremium}
-                                onChange={set("minimumPremium")}
-                                placeholder="500"
-                                prefix="₱"
-                            />
-                        </Field>
-                        <Field label="Maximum Premium">
-                            <NumInput
-                                name="maximumPremium"
-                                value={form.maximumPremium}
-                                onChange={set("maximumPremium")}
-                                placeholder="5000"
-                                prefix="₱"
-                            />
-                        </Field>
-                    </div>
-                </div>
-
                 <div className="rounded-lg bg-slate-50 border border-slate-200 px-4 py-3">
                     <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-1">
                         What this deducts
@@ -715,9 +667,9 @@ const PhilHealthTab = ({ rates, onChanged }) => {
                                 Number(form.employeeShare || 0),
                         )}{" "}
                         of salary from the employee
-                        {form.minimumPremium !== "" &&
-                            form.maximumPremium !== "" &&
-                            ` — ${fmt(Number(form.minimumPremium) * Number(form.employeeShare || 0))} to ${fmt(Number(form.maximumPremium) * Number(form.employeeShare || 0))} a month`}
+                        {form.minimumSalaryThreshold !== "" &&
+                            form.deductionCeiling !== "" &&
+                            ` — ${fmt(Number(form.minimumSalaryThreshold) * Number(form.premiumRate || 0) * Number(form.employeeShare || 0))} to ${fmt(Number(form.deductionCeiling) * Number(form.premiumRate || 0) * Number(form.employeeShare || 0))} a month`}
                     </p>
                 </div>
             </SettingsModal>

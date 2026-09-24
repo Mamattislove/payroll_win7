@@ -1,5 +1,11 @@
 import { useState, useEffect, useRef } from "react";
-import { redirect, useLoaderData, useRevalidator, useSearchParams, useRouteLoaderData } from "react-router-dom";
+import {
+    redirect,
+    useLoaderData,
+    useRevalidator,
+    useSearchParams,
+    useRouteLoaderData,
+} from "react-router-dom";
 import { toast } from "react-toastify";
 import { FiEdit2, FiPlus, FiTrash2, FiX } from "react-icons/fi";
 import customFetch from "../../utils/customFetch";
@@ -41,11 +47,18 @@ const fmt = (val) =>
         : "—";
 
 const fmtDate = (d) =>
-    d ? new Date(d).toLocaleDateString("en-PH", { year: "numeric", month: "short", day: "numeric" }) : "—";
+    d
+        ? new Date(d).toLocaleDateString("en-PH", {
+              year: "numeric",
+              month: "short",
+              day: "numeric",
+          })
+        : "—";
 
 const inputCls =
     "rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-800 outline-none focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-100 w-full";
-const labelCls = "text-[11px] font-semibold uppercase tracking-widest text-slate-400";
+const labelCls =
+    "text-[11px] font-semibold uppercase tracking-widest text-slate-400";
 
 // Searches employees server-side (`/employees?search=`) instead of filtering
 // a preloaded list — with 2000+ employees, loading them all up front made
@@ -59,7 +72,8 @@ const EmployeeCombobox = ({ value, onChange, disabled, initialEmployee }) => {
     const [loading, setLoading] = useState(false);
     const [selected, setSelected] = useState(null);
     const containerRef = useRef(null);
-    const empName = (e) => `${e?.firstName ?? ""} ${e?.lastName ?? ""}`.trim() || "—";
+    const empName = (e) =>
+        `${e?.firstName ?? ""} ${e?.lastName ?? ""}`.trim() || "—";
 
     useEffect(() => {
         if (!open) return;
@@ -82,44 +96,102 @@ const EmployeeCombobox = ({ value, onChange, disabled, initialEmployee }) => {
                 if (!cancelled) setLoading(false);
             }
         }, 300);
-        return () => { cancelled = true; clearTimeout(timer); };
+        return () => {
+            cancelled = true;
+            clearTimeout(timer);
+        };
     }, [query, open]);
 
-    const handleSelect = (emp) => { setSelected(emp); onChange(emp._id); setQuery(""); setOpen(false); };
-    const handleClear = () => { setSelected(null); onChange(""); setQuery(""); };
+    const handleSelect = (emp) => {
+        setSelected(emp);
+        onChange(emp._id);
+        setQuery("");
+        setOpen(false);
+    };
+    const handleClear = () => {
+        setSelected(null);
+        onChange("");
+        setQuery("");
+    };
     useEffect(() => {
         const handler = (e) => {
-            if (containerRef.current && !containerRef.current.contains(e.target)) { setOpen(false); setQuery(""); }
+            if (
+                containerRef.current &&
+                !containerRef.current.contains(e.target)
+            ) {
+                setOpen(false);
+                setQuery("");
+            }
         };
         document.addEventListener("mousedown", handler);
         return () => document.removeEventListener("mousedown", handler);
     }, []);
-    if (disabled) return <input type="text" value={empName(initialEmployee)} disabled className={`${inputCls} bg-slate-100 text-slate-400 cursor-not-allowed`} />;
-    const displayValue = open ? query : (selected ? empName(selected) : "");
+    if (disabled)
+        return (
+            <input
+                type="text"
+                value={empName(initialEmployee)}
+                disabled
+                className={`${inputCls} bg-slate-100 text-slate-400 cursor-not-allowed`}
+            />
+        );
+    const displayValue = open ? query : selected ? empName(selected) : "";
     return (
         <div ref={containerRef} className="relative w-full">
             <div className="relative">
-                <input type="text" value={displayValue}
-                    onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+                <input
+                    type="text"
+                    value={displayValue}
+                    onChange={(e) => {
+                        setQuery(e.target.value);
+                        setOpen(true);
+                    }}
                     onFocus={() => setOpen(true)}
-                    placeholder="Search employee…" className={`${inputCls} pr-8`} autoComplete="off" />
+                    placeholder="Search employee…"
+                    className={`${inputCls} pr-8`}
+                    autoComplete="off"
+                />
                 {selected && !open && (
-                    <button type="button" onClick={handleClear} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600" title="Clear">
+                    <button
+                        type="button"
+                        onClick={handleClear}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                        title="Clear"
+                    >
                         <FiX size={14} />
                     </button>
                 )}
             </div>
             {open && (
                 <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                    {loading ? <p className="px-3 py-2.5 text-sm text-slate-400">Searching…</p>
-                    : results.length === 0 ? <p className="px-3 py-2.5 text-sm text-slate-400">No employees found.</p>
-                    : results.map((e) => (
-                        <button key={e._id} type="button" onMouseDown={(ev) => ev.preventDefault()} onClick={() => handleSelect(e)}
-                            className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between gap-2 hover:bg-slate-50 ${value === e._id ? "bg-slate-50 font-semibold" : ""}`}>
-                            <span className="text-slate-800 truncate">{empName(e)}</span>
-                            {e.employeeCode && <span className="text-slate-400 text-xs shrink-0">{e.employeeCode}</span>}
-                        </button>
-                    ))}
+                    {loading ? (
+                        <p className="px-3 py-2.5 text-sm text-slate-400">
+                            Searching…
+                        </p>
+                    ) : results.length === 0 ? (
+                        <p className="px-3 py-2.5 text-sm text-slate-400">
+                            No employees found.
+                        </p>
+                    ) : (
+                        results.map((e) => (
+                            <button
+                                key={e._id}
+                                type="button"
+                                onMouseDown={(ev) => ev.preventDefault()}
+                                onClick={() => handleSelect(e)}
+                                className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between gap-2 hover:bg-slate-50 ${value === e._id ? "bg-slate-50 font-semibold" : ""}`}
+                            >
+                                <span className="text-slate-800 truncate">
+                                    {empName(e)}
+                                </span>
+                                {e.employeeCode && (
+                                    <span className="text-slate-400 text-xs shrink-0">
+                                        {e.employeeCode}
+                                    </span>
+                                )}
+                            </button>
+                        ))
+                    )}
                 </div>
             )}
         </div>
@@ -165,7 +237,11 @@ const RecordModal = ({ initial, chargeTypes, onClose, onSaved }) => {
             }
             onSaved();
         } catch (err) {
-            toast.error(err?.response?.data?.msg || err?.response?.data?.message || err.message);
+            toast.error(
+                err?.response?.data?.msg ||
+                    err?.response?.data?.message ||
+                    err.message,
+            );
         } finally {
             setSaving(false);
         }
@@ -178,17 +254,25 @@ const RecordModal = ({ initial, chargeTypes, onClose, onSaved }) => {
                     <h2 className="font-semibold text-slate-800">
                         {isEdit ? "Edit Charge Record" : "Add Charge Record"}
                     </h2>
-                    <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+                    <button
+                        onClick={onClose}
+                        className="text-slate-400 hover:text-slate-600"
+                    >
                         <FiX size={18} />
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-5 flex flex-col gap-3">
+                <form
+                    onSubmit={handleSubmit}
+                    className="p-5 flex flex-col gap-3"
+                >
                     <div className="flex flex-col gap-1">
                         <label className={labelCls}>Employee</label>
                         <EmployeeCombobox
                             value={form.employee}
-                            onChange={(val) => setForm((p) => ({ ...p, employee: val }))}
+                            onChange={(val) =>
+                                setForm((p) => ({ ...p, employee: val }))
+                            }
                             disabled={isEdit}
                             initialEmployee={initial?.employee}
                         />
@@ -196,10 +280,17 @@ const RecordModal = ({ initial, chargeTypes, onClose, onSaved }) => {
 
                     <div className="flex flex-col gap-1">
                         <label className={labelCls}>Charge Type</label>
-                        <select value={form.chargeType} onChange={set("chargeType")} required className={inputCls}>
+                        <select
+                            value={form.chargeType}
+                            onChange={set("chargeType")}
+                            required
+                            className={inputCls}
+                        >
                             <option value="">— Select type —</option>
                             {chargeTypes.map((t) => (
-                                <option key={t._id} value={t._id}>{t.chargeName}</option>
+                                <option key={t._id} value={t._id}>
+                                    {t.chargeName}
+                                </option>
                             ))}
                         </select>
                     </div>
@@ -229,7 +320,9 @@ const RecordModal = ({ initial, chargeTypes, onClose, onSaved }) => {
                     </div>
 
                     <div className="flex flex-col gap-1">
-                        <label className={labelCls}>Charge Date (optional)</label>
+                        <label className={labelCls}>
+                            Charge Date (optional)
+                        </label>
                         <input
                             type="date"
                             value={form.chargeDate}
@@ -256,7 +349,11 @@ const RecordModal = ({ initial, chargeTypes, onClose, onSaved }) => {
                             disabled={saving}
                             className="flex-1 py-2 rounded-lg bg-slate-900 text-white text-sm font-medium hover:bg-slate-700 disabled:opacity-60"
                         >
-                            {saving ? "Saving..." : isEdit ? "Update" : "Create"}
+                            {saving
+                                ? "Saving..."
+                                : isEdit
+                                  ? "Update"
+                                  : "Create"}
                         </button>
                         <button
                             type="button"
@@ -290,8 +387,12 @@ const Charges = () => {
     const revalidator = useRevalidator();
     const [searchParams, setSearchParams] = useSearchParams();
 
-    const [filterEmployee, setFilterEmployee] = useState(searchParams.get("employee") || "");
-    const [filterType, setFilterType] = useState(searchParams.get("chargeType") || "");
+    const [filterEmployee, setFilterEmployee] = useState(
+        searchParams.get("employee") || "",
+    );
+    const [filterType, setFilterType] = useState(
+        searchParams.get("chargeType") || "",
+    );
     const [modal, setModal] = useState(null); // null | "add" | record-object (edit)
     const [deleting, setDeleting] = useState(null);
     const { confirmModal, askConfirm } = useConfirm();
@@ -299,7 +400,8 @@ const Charges = () => {
     const applyFilter = (key, value) => {
         setSearchParams((prev) => {
             const p = new URLSearchParams(prev);
-            if (value) p.set(key, value); else p.delete(key);
+            if (value) p.set(key, value);
+            else p.delete(key);
             p.set("page", "1");
             return p;
         });
@@ -327,7 +429,11 @@ const Charges = () => {
                 toast.success("Charge record deleted");
                 revalidator.revalidate();
             } catch (err) {
-                toast.error(err?.response?.data?.msg || err?.response?.data?.message || err.message);
+                toast.error(
+                    err?.response?.data?.msg ||
+                        err?.response?.data?.message ||
+                        err.message,
+                );
             } finally {
                 setDeleting(null);
             }
@@ -353,8 +459,12 @@ const Charges = () => {
             {/* Header */}
             <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-800">Charges</h1>
-                    <p className="text-slate-500 mt-1">Total: {totalChargeRecords}</p>
+                    <h1 className="text-2xl font-bold text-slate-800">
+                        Charges
+                    </h1>
+                    <p className="text-slate-500 mt-1">
+                        Total: {totalChargeRecords}
+                    </p>
                 </div>
                 {mayEdit && (
                     <button
@@ -362,7 +472,7 @@ const Charges = () => {
                         className="flex items-center gap-2 py-2.5 px-4 text-sm text-white bg-slate-900 rounded-lg hover:bg-slate-700 transition-colors"
                     >
                         <FiPlus size={14} />
-                        Add Record
+                        Add Charges
                     </button>
                 )}
             </div>
@@ -374,7 +484,10 @@ const Charges = () => {
                     <div className="w-full sm:w-56">
                         <EmployeeCombobox
                             value={filterEmployee}
-                            onChange={(val) => { setFilterEmployee(val); applyFilter("employee", val); }}
+                            onChange={(val) => {
+                                setFilterEmployee(val);
+                                applyFilter("employee", val);
+                            }}
                         />
                     </div>
                 </div>
@@ -382,12 +495,17 @@ const Charges = () => {
                     <label className={labelCls}>Type</label>
                     <select
                         value={filterType}
-                        onChange={(e) => { setFilterType(e.target.value); applyFilter("chargeType", e.target.value); }}
+                        onChange={(e) => {
+                            setFilterType(e.target.value);
+                            applyFilter("chargeType", e.target.value);
+                        }}
                         className="w-full sm:w-auto rounded-lg border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 outline-none focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-100"
                     >
                         <option value="">All Types</option>
                         {chargeTypes.map((t) => (
-                            <option key={t._id} value={t._id}>{t.chargeName}</option>
+                            <option key={t._id} value={t._id}>
+                                {t.chargeName}
+                            </option>
                         ))}
                     </select>
                 </div>
@@ -406,17 +524,27 @@ const Charges = () => {
                 {/* Mobile card view */}
                 <div className="sm:hidden divide-y divide-slate-100">
                     {chargeRecords.length === 0 && (
-                        <p className="px-4 py-8 text-center text-slate-400">No charge records found.</p>
+                        <p className="px-4 py-8 text-center text-slate-400">
+                            No charge records found.
+                        </p>
                     )}
                     {chargeRecords.map((rec) => (
                         <div key={rec._id} className="p-4">
                             <div className="flex items-start justify-between gap-2 mb-2">
                                 <div className="min-w-0">
                                     <p className="font-medium text-slate-800 truncate">
-                                        {rec.employee?.firstName} {rec.employee?.lastName}
-                                        {rec.employee?.employeeCode && <span className="ml-1 text-xs text-slate-400">({rec.employee.employeeCode})</span>}
+                                        {rec.employee?.firstName}{" "}
+                                        {rec.employee?.lastName}
+                                        {rec.employee?.employeeCode && (
+                                            <span className="ml-1 text-xs text-slate-400">
+                                                ({rec.employee.employeeCode})
+                                            </span>
+                                        )}
                                     </p>
-                                    <p className="text-xs text-slate-500 mt-0.5">{rec.chargeType?.chargeName ?? "—"} · {rec.name}</p>
+                                    <p className="text-xs text-slate-500 mt-0.5">
+                                        {rec.chargeType?.chargeName ?? "—"} ·{" "}
+                                        {rec.name}
+                                    </p>
                                     <p className="text-xs text-slate-400 mt-0.5">
                                         {rec.payroll
                                             ? `${fmtDate(rec.payroll.payrollFrom)} – ${fmtDate(rec.payroll.payrollTo)}`
@@ -429,106 +557,148 @@ const Charges = () => {
                                 </div>
                                 {mayEdit && (
                                     <div className="flex items-center gap-1 shrink-0">
-                                        <button onClick={() => setModal(rec)} className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100" title="Edit"><FiEdit2 size={14} /></button>
-                                        <button onClick={() => handleDelete(rec._id)} disabled={deleting === rec._id} className="p-2 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-40" title="Delete"><FiTrash2 size={14} /></button>
+                                        <button
+                                            onClick={() => setModal(rec)}
+                                            className="p-2 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+                                            title="Edit"
+                                        >
+                                            <FiEdit2 size={14} />
+                                        </button>
+                                        <button
+                                            onClick={() =>
+                                                handleDelete(rec._id)
+                                            }
+                                            disabled={deleting === rec._id}
+                                            className="p-2 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-40"
+                                            title="Delete"
+                                        >
+                                            <FiTrash2 size={14} />
+                                        </button>
                                     </div>
                                 )}
                             </div>
-                            <p className="text-sm font-semibold text-slate-700">{fmt(rec.amount)}</p>
+                            <p className="text-sm font-semibold text-slate-700">
+                                {fmt(rec.amount)}
+                            </p>
                         </div>
                     ))}
                 </div>
                 {/* Desktop table */}
                 <div className="hidden sm:block overflow-x-auto">
-                <table className="w-full text-sm">
-                    <thead>
-                        <tr className="bg-slate-900 text-white text-xs uppercase tracking-wider">
-                            <th className="px-4 py-3 text-left">#</th>
-                            <th className="px-4 py-3 text-left">Employee</th>
-                            <th className="px-4 py-3 text-left">Type</th>
-                            <th className="px-4 py-3 text-left">Name</th>
-                            <th className="px-4 py-3 text-left">Pay Period</th>
-                            <th className="px-4 py-3 text-right">Amount</th>
-                            {mayEdit && (
-                                <th className="px-4 py-3 text-center">Actions</th>
-                            )}
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {chargeRecords.length === 0 && (
-                            <tr>
-                                <td colSpan={mayEdit ? 7 : 6} className="px-4 py-8 text-center text-slate-400">
-                                    No charge records found.
-                                </td>
-                            </tr>
-                        )}
-                        {chargeRecords.map((rec, idx) => (
-                            <tr
-                                key={rec._id}
-                                className={`${idx % 2 === 0 ? "bg-white" : "bg-slate-50"} hover:bg-slate-100`}
-                            >
-                                <td className="px-4 py-3 text-slate-500">
-                                    {(currentPage - 1) * 20 + idx + 1}
-                                </td>
-                                <td className="px-4 py-3 font-medium text-slate-800">
-                                    {rec.employee?.firstName} {rec.employee?.lastName}
-                                    {rec.employee?.employeeCode && (
-                                        <span className="ml-1 text-xs text-slate-400">({rec.employee.employeeCode})</span>
-                                    )}
-                                </td>
-                                <td className="px-4 py-3 text-slate-600">
-                                    {rec.chargeType?.chargeName ?? "—"}
-                                </td>
-                                <td className="px-4 py-3 text-slate-700">{rec.name}</td>
-                                <td className="px-4 py-3 text-slate-500 text-xs">
-                                    {rec.payroll ? (
-                                        `${fmtDate(rec.payroll.payrollFrom)} – ${fmtDate(rec.payroll.payrollTo)}`
-                                    ) : rec.excludedFromPayroll ? (
-                                        <span className="italic text-amber-600">
-                                            Removed — will not be collected
-                                        </span>
-                                    ) : rec.chargeDate ? (
-                                        <span className="italic text-slate-400">
-                                            Standing — for {fmtDate(rec.chargeDate)}
-                                        </span>
-                                    ) : (
-                                        <span className="italic text-slate-400">
-                                            Standing (next run)
-                                        </span>
-                                    )}
-                                </td>
-                                <td className="px-4 py-3 text-right font-medium text-slate-700">
-                                    {fmt(rec.amount)}
-                                </td>
+                    <table className="w-full text-sm">
+                        <thead>
+                            <tr className="bg-slate-900 text-white text-xs uppercase tracking-wider">
+                                <th className="px-4 py-3 text-left">#</th>
+                                <th className="px-4 py-3 text-left">
+                                    Employee
+                                </th>
+                                <th className="px-4 py-3 text-left">Type</th>
+                                <th className="px-4 py-3 text-left">Name</th>
+                                <th className="px-4 py-3 text-left">
+                                    Pay Period
+                                </th>
+                                <th className="px-4 py-3 text-right">Amount</th>
                                 {mayEdit && (
-                                    <td className="px-4 py-3">
-                                        <div className="flex items-center justify-center gap-2">
-                                            <button
-                                                onClick={() => setModal(rec)}
-                                                className="text-slate-400 hover:text-slate-700"
-                                                title="Edit"
-                                            >
-                                                <FiEdit2 size={14} />
-                                            </button>
-                                            <button
-                                                onClick={() => handleDelete(rec._id)}
-                                                disabled={deleting === rec._id}
-                                                className="text-red-400 hover:text-red-600 disabled:opacity-40"
-                                                title="Delete"
-                                            >
-                                                <FiTrash2 size={14} />
-                                            </button>
-                                        </div>
-                                    </td>
+                                    <th className="px-4 py-3 text-center">
+                                        Actions
+                                    </th>
                                 )}
                             </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                            {chargeRecords.length === 0 && (
+                                <tr>
+                                    <td
+                                        colSpan={mayEdit ? 7 : 6}
+                                        className="px-4 py-8 text-center text-slate-400"
+                                    >
+                                        No charge records found.
+                                    </td>
+                                </tr>
+                            )}
+                            {chargeRecords.map((rec, idx) => (
+                                <tr
+                                    key={rec._id}
+                                    className={`${idx % 2 === 0 ? "bg-white" : "bg-slate-50"} hover:bg-slate-100`}
+                                >
+                                    <td className="px-4 py-3 text-slate-500">
+                                        {(currentPage - 1) * 20 + idx + 1}
+                                    </td>
+                                    <td className="px-4 py-3 font-medium text-slate-800">
+                                        {rec.employee?.firstName}{" "}
+                                        {rec.employee?.lastName}
+                                        {rec.employee?.employeeCode && (
+                                            <span className="ml-1 text-xs text-slate-400">
+                                                ({rec.employee.employeeCode})
+                                            </span>
+                                        )}
+                                    </td>
+                                    <td className="px-4 py-3 text-slate-600">
+                                        {rec.chargeType?.chargeName ?? "—"}
+                                    </td>
+                                    <td className="px-4 py-3 text-slate-700">
+                                        {rec.name}
+                                    </td>
+                                    <td className="px-4 py-3 text-slate-500 text-xs">
+                                        {rec.payroll ? (
+                                            `${fmtDate(rec.payroll.payrollFrom)} – ${fmtDate(rec.payroll.payrollTo)}`
+                                        ) : rec.excludedFromPayroll ? (
+                                            <span className="italic text-amber-600">
+                                                Removed — will not be collected
+                                            </span>
+                                        ) : rec.chargeDate ? (
+                                            <span className="italic text-slate-400">
+                                                Standing — for{" "}
+                                                {fmtDate(rec.chargeDate)}
+                                            </span>
+                                        ) : (
+                                            <span className="italic text-slate-400">
+                                                Standing (next run)
+                                            </span>
+                                        )}
+                                    </td>
+                                    <td className="px-4 py-3 text-right font-medium text-slate-700">
+                                        {fmt(rec.amount)}
+                                    </td>
+                                    {mayEdit && (
+                                        <td className="px-4 py-3">
+                                            <div className="flex items-center justify-center gap-2">
+                                                <button
+                                                    onClick={() =>
+                                                        setModal(rec)
+                                                    }
+                                                    className="text-slate-400 hover:text-slate-700"
+                                                    title="Edit"
+                                                >
+                                                    <FiEdit2 size={14} />
+                                                </button>
+                                                <button
+                                                    onClick={() =>
+                                                        handleDelete(rec._id)
+                                                    }
+                                                    disabled={
+                                                        deleting === rec._id
+                                                    }
+                                                    className="text-red-400 hover:text-red-600 disabled:opacity-40"
+                                                    title="Delete"
+                                                >
+                                                    <FiTrash2 size={14} />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    )}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
-            <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setPage} />
+            <Pagination
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setPage}
+            />
             {confirmModal}
         </div>
     );
