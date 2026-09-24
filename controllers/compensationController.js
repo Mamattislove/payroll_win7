@@ -13,6 +13,7 @@ export const getAllCompensations = async (req, res) => {
         employeeDesignation,
         activeStatus,
         client,
+        department,
         search = "",
         employeeStatus = "",
     } = req.query;
@@ -32,11 +33,13 @@ export const getAllCompensations = async (req, res) => {
     // client directly — both hang off EmployeeDesignation — so resolve down to
     // the matching designations and restrict the compensation query to those,
     // rather than loading every compensation to filter client-side.
-    if (search || employeeStatus || client) {
+    if (search || employeeStatus || client || department) {
         const designationQuery = {};
 
-        // client sits on the designation, so it narrows the same lookup.
+        // client and department sit on the designation, so they narrow the
+        // same lookup.
         if (client) designationQuery.client = client;
+        if (department) designationQuery.department = department;
 
         if (search || employeeStatus) {
             const employeeQuery = {};

@@ -6,10 +6,11 @@ import {
     useRevalidator,
 } from "react-router-dom";
 import { toast } from "react-toastify";
-import { FiPlus, FiEdit2, FiEye, FiX } from "react-icons/fi";
+import { FiPlus, FiEdit2, FiEye, FiX, FiDownload } from "react-icons/fi";
 import customFetch from "../../utils/customFetch";
 import { fetchAllPages } from "../../utils/fetchAllPages";
 import { Overlay, Pagination } from "../components";
+import CompensationReport from "../components/CompensationReport";
 import {
     CONTRACT_TYPES,
     PAYROLL_PERIODS,
@@ -165,6 +166,7 @@ const Compensation = () => {
     const status = searchParams.get("status") || "";
 
     const [searchInput, setSearchInput] = useState(search);
+    const [reportOpen, setReportOpen] = useState(false);
     const [modal, setModal] = useState(null);
     const [saving, setSaving] = useState(false);
     const [monthlyRateInput, setMonthlyRateInput] = useState("");
@@ -464,7 +466,21 @@ const Compensation = () => {
                         Total: {totalEmployees}
                     </p>
                 </div>
+                <button
+                    type="button"
+                    onClick={() => setReportOpen(true)}
+                    className="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50"
+                >
+                    <FiDownload />
+                    Download Report
+                </button>
             </div>
+
+            <CompensationReport
+                isOpen={reportOpen}
+                onClose={() => setReportOpen(false)}
+                clients={clients}
+            />
 
             {/* Filters */}
             <div className="mb-4 flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-center">

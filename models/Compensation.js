@@ -43,17 +43,17 @@ const compensationSchema = new mongoose.Schema(
         sssContributionBasis: {
             type: String,
             enum: Object.values(SSS_CONTRIBUTION_BASIS),
-            default: SSS_CONTRIBUTION_BASIS.GROSS_PAY,
+            default: SSS_CONTRIBUTION_BASIS.BASIC_PAY,
         },
         philhealthContributionBasis: {
             type: String,
             enum: Object.values(PHILHEALTH_CONTRIBUTION_BASIS),
-            default: PHILHEALTH_CONTRIBUTION_BASIS.GROSS_PAY,
+            default: PHILHEALTH_CONTRIBUTION_BASIS.BASIC_PAY,
         },
         pagibigContributionBasis: {
             type: String,
             enum: Object.values(PAGIBIG_CONTRIBUTION_BASIS),
-            default: PAGIBIG_CONTRIBUTION_BASIS.GROSS_PAY,
+            default: PAGIBIG_CONTRIBUTION_BASIS.BASIC_PAY,
         },
         sssOverwriteAmount: { type: Number, default: 0 },
         philhealthOverwriteAmount: { type: Number, default: 0 },

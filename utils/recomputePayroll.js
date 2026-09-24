@@ -7,10 +7,8 @@ import LoanPayment from "../models/LoanPayment.js";
 import ChargeRecord from "../models/ChargeRecord.js";
 import Compensation from "../models/Compensation.js";
 import { derivePayrollTotals } from "./payrollTotals.js";
-import { computeGovContributions } from "./computeGovContributions.js";
-import { contributionFactor } from "./contributionFactor.js";
+import { computeContributionsForRun } from "./computeGovContributions.js";
 
-const r2 = (n) => Math.round(n * 100) / 100;
 const sum = (records) => records.reduce((acc, r) => acc + (r.amount ?? 0), 0);
 
 /**
@@ -64,32 +62,46 @@ async function recomputeGrossBasisContributions(
         earningsTotal +
         allowancesTotal;
 
-    const year = new Date(payroll.payrollFrom).getFullYear();
-    const fresh = await computeGovContributions(compensation, year, {
+    // Month-to-date and already sized for this run. Both halves of each
+    // contribution are restated together: they come out of one bracket, and
+    // quoting an employee share from one and an employer share from another is
+    // how the two ended up disagreeing before.
+    return computeContributionsForRun(compensation, {
+        payrollId: payroll._id,
+        payrollFrom: payroll.payrollFrom,
         periodGross,
         periodBasic: payroll.regularPay ?? 0,
     });
-    const factor = contributionFactor(
-        compensation.payrollPeriod,
-        payroll.payrollFrom,
-    );
-
-    // Both halves of each contribution are restated together: they come out of
-    // one bracket, and quoting an employee share from one and an employer share
-    // from another is how the two ended up disagreeing before.
-    const at = (key) => r2((fresh[key] ?? 0) * factor);
-
-    return {
-        sssContribution: at("sssContribution"),
-        philhealthContribution: at("philhealthContribution"),
-        pagibigContribution: at("pagibigContribution"),
-        sssEmployerContribution: at("sssEmployerContribution"),
-        philhealthEmployerContribution: at("philhealthEmployerContribution"),
-        pagibigEmployerContribution: at("pagibigEmployerContribution"),
-    };
 }
 
-export async function recomputePayrollTotals(payrollId) {
+/**
+ * Restates the runs that come after this one in the same month.
+ *
+ * PhilHealth on a later run is the month's premium less what the earlier runs
+ * took, so correcting the first cutoff leaves the second quoting a remainder
+ * worked out against the old figure. Locked runs have been paid and are left
+ * as paid, the same rule syncPayrollAttendance follows.
+ */
+export async function recomputeLaterRunsThisMonth(payroll) {
+    const from = new Date(payroll.payrollFrom);
+    const nextMonth = new Date(
+        Date.UTC(from.getUTCFullYear(), from.getUTCMonth() + 1, 1),
+    );
+    const later = await Payroll.find({
+        compensation: payroll.compensation,
+        payrollFrom: { $gt: from, $lt: nextMonth },
+        locked: { $ne: true },
+    })
+        .sort({ payrollFrom: 1 })
+        .select("_id")
+        .lean();
+
+    // In order, so each one reads the runs before it already restated.
+    for (const p of later)
+        await recomputePayrollTotals(p._id, { cascade: false });
+}
+
+export async function recomputePayrollTotals(payrollId, { cascade = true } = {}) {
     const [payroll, earnings, allowances, deductions, savingsPayments, loanPayments, charges] =
         await Promise.all([
             Payroll.findById(payrollId),
@@ -136,7 +148,7 @@ export async function recomputePayrollTotals(payrollId) {
             charges: sum(charges),
         });
 
-    return Payroll.findByIdAndUpdate(
+    const updated = await Payroll.findByIdAndUpdate(
         payrollId,
         {
             earning: earnings.map((r) => r._id),
@@ -153,4 +165,7 @@ export async function recomputePayrollTotals(payrollId) {
         },
         { new: true },
     );
+
+    if (cascade) await recomputeLaterRunsThisMonth(payroll);
+    return updated;
 }

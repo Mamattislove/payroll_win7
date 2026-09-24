@@ -21,10 +21,12 @@ import {
 } from "../utils/constants.js";
 import { existingCompensation } from "../middlewares/existingMiddleware.js";
 import { computePayroll } from "../utils/computePayroll.js";
-import { recomputePayrollTotals } from "../utils/recomputePayroll.js";
+import {
+    recomputePayrollTotals,
+    recomputeLaterRunsThisMonth,
+} from "../utils/recomputePayroll.js";
 import { syncPayrollAttendance } from "../utils/syncPayrollAttendance.js";
-import { computeGovContributions } from "../utils/computeGovContributions.js";
-import { contributionFactor } from "../utils/contributionFactor.js";
+import { computeContributionsForRun } from "../utils/computeGovContributions.js";
 
 const r2 = (n) => Math.round(n * 100) / 100;
 
@@ -532,15 +534,7 @@ async function generatePayrollFor(
         leaveDays,
     } = computePayroll(attendances, dailyRate);
 
-    const year = new Date(payrollFrom).getFullYear();
-    const {
-        sssContribution: rawSss,
-        philhealthContribution: rawPh,
-        pagibigContribution: rawPi,
-        sssEmployerContribution: rawSssEmp,
-        philhealthEmployerContribution: rawPhEmp,
-        pagibigEmployerContribution: rawPiEmp,
-    } = await computeGovContributions(compensationDoc, year, {
+    const periodPay = {
         // Earnings and allowances are attached below, after the payroll exists,
         // so the gross known here is attendance pay only. recomputePayrollTotals
         // restates a "gross pay" employee's contributions once they are on.
@@ -554,20 +548,20 @@ async function generatePayrollFor(
         // "Basic pay" is the regular pay actually earned this period -- the
         // same figure the payroll journal prints under BASIC PAY.
         periodBasic: regularPay,
-    });
-
-    // Government contributions are monthly obligations, so each run deducts
-    // only its share of the month (see utils/contributionFactor.js).
-    const factor = contributionFactor(
-        compensationDoc.payrollPeriod,
+    };
+    // SSS, PhilHealth and Pag-IBIG are collected month-to-date, so each comes
+    // out already sized for this run (see computeContributionsForRun).
+    const {
+        sssContribution,
+        philhealthContribution,
+        pagibigContribution,
+        sssEmployerContribution,
+        philhealthEmployerContribution,
+        pagibigEmployerContribution,
+    } = await computeContributionsForRun(compensationDoc, {
         payrollFrom,
-    );
-    const sssContribution = r2(rawSss * factor);
-    const philhealthContribution = r2(rawPh * factor);
-    const pagibigContribution = r2(rawPi * factor);
-    const sssEmployerContribution = r2(rawSssEmp * factor);
-    const philhealthEmployerContribution = r2(rawPhEmp * factor);
-    const pagibigEmployerContribution = r2(rawPiEmp * factor);
+        ...periodPay,
+    });
 
     const payroll = await Payroll.create({
         ...payrollFields,
@@ -917,6 +911,31 @@ export const updatePayroll = async (req, res) => {
     res.status(StatusCodes.OK).json({ payroll: updated });
 };
 
+/**
+ * Re-derives a payroll from the data behind it as it stands now: attendance
+ * re-read and priced at the compensation's current daily rate, contributions
+ * recomputed from its current bases, overwrites and the rate tables, and the
+ * totals rebuilt. For when HR corrects a compensation or attendance after the
+ * payroll was generated.
+ *
+ * Contributions keyed in by hand on the edit screen are dropped: the point of
+ * refreshing is to price from the source again, and a manual figure would
+ * otherwise quietly survive it. A locked payroll has been paid and is refused.
+ */
+export const refreshPayroll = async (req, res) => {
+    const payrollId = req.params.payrollId;
+    if (req.payroll.locked)
+        throw new BadRequestError(
+            "this payroll is locked because it has been paid, and cannot be refreshed",
+        );
+
+    await Payroll.findByIdAndUpdate(payrollId, {
+        contributionsOverridden: false,
+    });
+    const updated = await syncPayrollAttendance(payrollId);
+    res.status(StatusCodes.OK).json({ payroll: updated });
+};
+
 export const deletePayroll = async (req, res) => {
     const payrollId = req.params.payrollId;
 
@@ -935,6 +954,9 @@ export const deletePayroll = async (req, res) => {
 
     const payroll = await Payroll.findByIdAndDelete(payrollId);
     if (!payroll) throw new NotFoundError(`No payroll with id ${payrollId}`);
+    // A later run of the month priced its PhilHealth as the remainder after
+    // this one; with this one gone, that remainder is wrong.
+    await recomputeLaterRunsThisMonth(payroll);
     res.status(StatusCodes.OK).json({ msg: "payroll deleted" });
 };
 

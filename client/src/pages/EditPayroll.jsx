@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { Link, redirect, useLoaderData, useNavigate, useRouteLoaderData } from "react-router-dom";
+import { Link, redirect, useLoaderData, useNavigate, useRevalidator, useRouteLoaderData } from "react-router-dom";
 import { toast } from "react-toastify";
-import { FiArrowLeft, FiEdit2, FiPlus, FiTrash2, FiX } from "react-icons/fi";
+import { FiArrowLeft, FiEdit2, FiPlus, FiRefreshCw, FiTrash2, FiX } from "react-icons/fi";
 import customFetch from "../../utils/customFetch";
 import { InfoField, useConfirm } from "../components";
 import ErrorState, {
@@ -1253,6 +1253,41 @@ const EditPayroll = () => {
         setPayroll(data.payroll);
     };
 
+    // Re-prices the payroll from its source data as it stands now -- for when
+    // HR corrects the compensation (rate, contribution basis, overwrite) or the
+    // attendance after this payroll was generated.
+    const revalidator = useRevalidator();
+    const { confirmModal: refreshConfirm, askConfirm: askRefresh } = useConfirm();
+    const [refreshing, setRefreshing] = useState(false);
+
+    const recompute = () =>
+        askRefresh(
+            "Refresh this payroll? Pay is recomputed from the current attendance " +
+                "and daily rate, and SSS, PhilHealth and Pag-IBIG from the current " +
+                "compensation settings and rate tables." +
+                (payroll.contributionsOverridden
+                    ? " The contributions entered by hand on this payroll will be replaced."
+                    : ""),
+            async () => {
+                setRefreshing(true);
+                try {
+                    await customFetch.post(`/payrolls/${payroll._id}/refresh`);
+                    await refresh();
+                    // The attendance list comes from the loader, not the payroll.
+                    revalidator.revalidate();
+                    toast.success("Payroll refreshed");
+                } catch (error) {
+                    toast.error(
+                        error?.response?.data?.msg ||
+                            error?.response?.data?.message ||
+                            error.message,
+                    );
+                } finally {
+                    setRefreshing(false);
+                }
+            },
+        );
+
     const employeeId =
         payroll.compensation?.employeeDesignation?.employee?._id ??
         payroll.compensation?.employeeDesignation?.employee;
@@ -1311,10 +1346,34 @@ const EditPayroll = () => {
                         {toDate(payroll.payrollFrom)} to {toDate(payroll.payrollTo)}
                     </p>
                 </div>
-                <span className="ml-auto text-xs px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">
-                    Editing
-                </span>
+                <div className="ml-auto flex items-center gap-2">
+                    {payroll.locked ? (
+                        <span
+                            className="text-xs px-2.5 py-1 rounded-full bg-slate-100 text-slate-600 font-medium"
+                            title="Paid payrolls are kept exactly as paid"
+                        >
+                            Locked
+                        </span>
+                    ) : (
+                        <button
+                            type="button"
+                            onClick={recompute}
+                            disabled={refreshing}
+                            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                        >
+                            <FiRefreshCw
+                                size={12}
+                                className={refreshing ? "animate-spin" : ""}
+                            />
+                            {refreshing ? "Refreshing…" : "Refresh Payroll"}
+                        </button>
+                    )}
+                    <span className="text-xs px-2.5 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">
+                        Editing
+                    </span>
+                </div>
             </div>
+            {refreshConfirm}
 
             {/* Two-column layout */}
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 items-start">

@@ -23,6 +23,28 @@ import { PAYROLL_PERIODS } from "./constants.js";
  * @param {Date|string} payrollFrom - start of the pay period
  * @returns {number} multiplier to apply to the monthly contribution
  */
+/**
+ * How many payroll runs make up a month, used to turn one period's earnings
+ * back into the monthly figure the SSS/PhilHealth/Pag-IBIG tables are indexed
+ * by. It is the inverse of contributionFactor: that splits a monthly obligation
+ * across runs, this reassembles a monthly wage out of them, and the two must
+ * multiply to 1 for every period -- including the unset case, where
+ * contributionFactor deducts the whole monthly amount in one run and so this
+ * must treat the run as the whole month rather than doubling it.
+ */
+export function runsPerMonth(payrollPeriod) {
+    switch (payrollPeriod) {
+        case PAYROLL_PERIODS.WEEKLY:
+            return 4;
+        case PAYROLL_PERIODS.SEMI_MONTHLY:
+        case PAYROLL_PERIODS.DAILY:
+            return 2;
+        case PAYROLL_PERIODS.MONTHLY:
+        default:
+            return 1;
+    }
+}
+
 export function contributionFactor(payrollPeriod, payrollFrom) {
     switch (payrollPeriod) {
         case PAYROLL_PERIODS.MONTHLY:

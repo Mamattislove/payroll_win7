@@ -8,6 +8,7 @@ import {
     batchCreatePayrolls,
     createPayroll,
     updatePayroll,
+    refreshPayroll,
     deletePayroll,
 } from "../controllers/payrollController.js";
 import {
@@ -42,6 +43,14 @@ router
         validatePayrollInput,
         createPayroll,
     );
+
+// Re-derives one payroll from its current attendance and compensation.
+router.post(
+    "/:payrollId/refresh",
+    validatePayrollParamId,
+    authorizePermission(...WRITE_ROLES.payrolls),
+    refreshPayroll,
+);
 
 router
     .route("/:payrollId")

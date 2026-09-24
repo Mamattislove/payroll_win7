@@ -1,10 +1,10 @@
 import SSSRate from "../models/SSSRate.js";
 import PhilHealthRate from "../models/PhilHealthRate.js";
 import PagIbigRate from "../models/PagIbigRate.js";
-import {
-    SSS_CONTRIBUTION_BASIS,
-    PAYROLL_PERIODS,
-} from "./constants.js";
+import Payroll from "../models/Payroll.js";
+import { SSS_CONTRIBUTION_BASIS } from "./constants.js";
+import { contributionFactor, runsPerMonth } from "./contributionFactor.js";
+import { philhealthMonthly, philhealthPerRun } from "./philhealthPremium.js";
 
 const r2 = (n) => Math.round(n * 100) / 100;
 
@@ -13,26 +13,6 @@ const r2 = (n) => Math.round(n * 100) / 100;
 // before the bracket is looked up. One constant, one place to correct it.
 const SIL_DAYS_PER_YEAR = 5;
 const MONTHS_PER_YEAR = 12;
-
-// How many payroll runs make up a month, used to turn one period's earnings
-// back into the monthly figure the SSS/PhilHealth/Pag-IBIG tables are indexed
-// by. It is the inverse of contributionFactor: that splits a monthly obligation
-// across runs, this reassembles a monthly wage out of them, and the two must
-// multiply to 1 for every period -- including the unset case, where
-// contributionFactor deducts the whole monthly amount in one run and so this
-// must treat the run as the whole month rather than doubling it.
-const runsPerMonth = (payrollPeriod) => {
-    switch (payrollPeriod) {
-        case PAYROLL_PERIODS.WEEKLY:
-            return 4;
-        case PAYROLL_PERIODS.SEMI_MONTHLY:
-        case PAYROLL_PERIODS.DAILY:
-            return 2;
-        case PAYROLL_PERIODS.MONTHLY:
-        default:
-            return 1;
-    }
-};
 
 /**
  * The monthly wage the contribution table is indexed by, for one basis.
@@ -149,26 +129,6 @@ async function getSSSContributions(wage, year) {
     };
 }
 
-// PhilHealth when the rate row leaves a bound out. The floor and ceiling are
-// part of the schedule, not optional extras -- the rows for 2019-2025 carry no
-// deductionCeiling, and without a fallback a high earner there is charged the
-// premium on their whole salary with nothing stopping it.
-const PHILHEALTH_DEFAULT_FLOOR = 10000;
-const PHILHEALTH_DEFAULT_CEILING = 100000;
-
-/**
- * PhilHealth for one month.
- *
- * `wage` is already the right figure for this employee: bracketWage picks the
- * period's basic pay or gross pay according to the compensation's
- * philhealthContributionBasis, and scales it to a month. This function only
- * clamps it and applies the premium.
- *
- * Rate, floor, ceiling and the employee's portion come from the year's rate row
- * rather than being fixed in code, because they have all moved -- the premium
- * ran 2.75% in 2019 and 5% from 2024 -- and a past period has to price on the
- * schedule that was in force at the time.
- */
 async function getPhilHealthContributions(wage, year) {
     let rate = await PhilHealthRate.findOne({ year });
     if (!rate) rate = await PhilHealthRate.findOne().sort({ year: -1 });
@@ -176,25 +136,181 @@ async function getPhilHealthContributions(wage, year) {
         console.warn(`[computeGovContributions] No PhilHealth rate found for year=${year}.`);
         return { employee: 0, employer: 0 };
     }
+    // Floor, ceiling, rate, minimum and maximum premium and the split all come
+    // from the year's row; the arithmetic is shared with the Settings page's
+    // calculator (utils/philhealthPremium.js) so the two cannot drift.
+    return philhealthMonthly(rate, wage);
+}
 
-    const { premiumRate, employeeShare, minimumSalaryThreshold, deductionCeiling } = rate;
+/**
+ * SSS, PhilHealth and Pag-IBIG for one payroll run, employee and employer.
+ *
+ * SSS is collected month-to-date, as the previous system did it:
+ *
+ *   first run of the month   the bracket for this run's pay alone
+ *   later runs               the bracket for the month's pay so far, less
+ *                            what the earlier runs already took
+ *
+ *   e.g. 7,343.16 then 7,266.67 -> 375 (MSC 7,500), then 725 (MSC 14,500) - 375
+ *
+ * PhilHealth and Pag-IBIG are priced per cutoff: this run's pay is scaled up to
+ * a month (x1 monthly, x2 semi-monthly and daily, x4 weekly -- bracketWage) and
+ * the monthly contribution is looked up on that. Pag-IBIG then deducts its
+ * share of the month (half a semi-monthly month, a quarter of a weekly one --
+ * contributionFactor). PhilHealth deducts the whole share on every run (see
+ * philhealthPerRun): the salary held between the floor and ceiling, times the
+ * rate, held between the minimum and maximum premium, split by the employee
+ * share -- all from the rate table.
+ *
+ * `payrollId` is the run being priced when it already exists, so it is not
+ * counted as one of its own earlier runs.
+ */
+export async function computeContributionsForRun(
+    compensation,
+    { payrollId = null, payrollFrom, periodBasic = 0, periodGross = 0 },
+) {
+    const from = new Date(payrollFrom);
+    const year = from.getFullYear();
+    const monthStart = new Date(
+        Date.UTC(from.getUTCFullYear(), from.getUTCMonth(), 1),
+    );
+    const earlier = await Payroll.find({
+        compensation: compensation._id,
+        payrollFrom: { $gte: monthStart, $lt: from },
+        ...(payrollId && { _id: { $ne: payrollId } }),
+    })
+        .select(
+            "regularPay grossPay " +
+                "sssContribution sssEmployerContribution " +
+                "philhealthContribution philhealthEmployerContribution " +
+                "pagibigContribution pagibigEmployerContribution",
+        )
+        .lean();
 
-    // 1. Clamp the salary within the floor and ceiling.
-    const floor = minimumSalaryThreshold || PHILHEALTH_DEFAULT_FLOOR;
-    const ceiling = deductionCeiling || PHILHEALTH_DEFAULT_CEILING;
-    let base = wage;
-    if (base < floor) base = floor;
-    else if (base > ceiling) base = ceiling;
+    const total = (key) => earlier.reduce((s, p) => s + (p[key] ?? 0), 0);
 
-    // 2. Total premium on the clamped salary, then split it. The split comes
-    //    from the table (0.5 today, an even halving) rather than a hardcoded
-    //    /2, so a year that shares it unevenly can be entered without a code
-    //    change.
-    const totalPremium = base * premiumRate;
+    // The month's pay so far on a given basis. Nothing is scaled: the runs are
+    // added up rather than one of them multiplied out.
+    const monthBasic = total("regularPay") + periodBasic;
+    const monthGross = total("grossPay") + periodGross;
+    const wageFor = (basis) => {
+        let wage;
+        switch (basis) {
+            case SSS_CONTRIBUTION_BASIS.GROSS_PAY:
+                wage = monthGross;
+                break;
+            case SSS_CONTRIBUTION_BASIS.BASIC_WITH_SIL:
+                wage =
+                    monthBasic +
+                    ((compensation.dailyRate ?? 0) * SIL_DAYS_PER_YEAR) /
+                        MONTHS_PER_YEAR;
+                break;
+            default:
+                wage = monthBasic;
+        }
+        // Nothing earned at all: price on the standing rate rather than letting
+        // a zero fall silently to the lowest bracket, as bracketWage does.
+        return r2(wage > 0 ? wage : (compensation.monthlyRate ?? 0));
+    };
+
+    const factor = contributionFactor(compensation.payrollPeriod, payrollFrom);
+
+    const forRun = async ({
+        basisKey,
+        overwriteKey,
+        eeKey,
+        erKey,
+        lookup,
+        monthToDate,
+    }) => {
+        const basis = compensation[basisKey] || SSS_CONTRIBUTION_BASIS.BASIC_PAY;
+        if (basis === SSS_CONTRIBUTION_BASIS.NO_DEDUCTION)
+            return { employee: 0, employer: 0 };
+
+        // An overwrite keeps its meaning: a monthly figure, split across the
+        // runs by the contribution factor.
+        const overwrite = compensation[overwriteKey] ?? 0;
+        if (overwrite > 0)
+            return { employee: r2(overwrite * factor), employer: 0 };
+
+        // Per cutoff: this run scaled to a month, and the run's share of it.
+        if (!monthToDate) {
+            const month = await lookup(
+                bracketWage(basis, compensation, periodGross, periodBasic),
+                year,
+            );
+            // PhilHealth's per-run split is shared with the Settings calculator
+            // (see philhealthPerRun).
+            if (month.minimumPremium != null) {
+                const { employee, employer } = philhealthPerRun(
+                    month,
+                    compensation.payrollPeriod,
+                    factor,
+                );
+                return { employee, employer };
+            }
+            return {
+                employee: r2(month.employee * factor),
+                employer: r2(month.employer * factor),
+            };
+        }
+
+        const month = await lookup(wageFor(basis), year);
+        const employee = Math.max(0, r2(month.employee - total(eeKey)));
+
+        // The employer's part is its own month-to-date remainder when the
+        // earlier runs recorded one. Payrolls imported from the old system
+        // carry the employee share only, with the employer share at 0; a
+        // remainder worked against those zeros put the whole month's employer
+        // share on this run, so then it follows the employee's part in the
+        // proportion the table gives instead (equal for PhilHealth, about 2:1
+        // for SSS).
+        const earlierRecordedEmployer = earlier.every(
+            (p) => !((p[eeKey] ?? 0) > 0) || (p[erKey] ?? 0) > 0,
+        );
+        const employer = earlierRecordedEmployer
+            ? Math.max(0, r2(month.employer - total(erKey)))
+            : r2(
+                  employee *
+                      (month.employee > 0 ? month.employer / month.employee : 1),
+              );
+        return { employee, employer };
+    };
+
+    const [sss, philhealth, pagibig] = await Promise.all([
+        forRun({
+            basisKey: "sssContributionBasis",
+            overwriteKey: "sssOverwriteAmount",
+            eeKey: "sssContribution",
+            erKey: "sssEmployerContribution",
+            lookup: getSSSContributions,
+            monthToDate: true,
+        }),
+        forRun({
+            basisKey: "philhealthContributionBasis",
+            overwriteKey: "philhealthOverwriteAmount",
+            eeKey: "philhealthContribution",
+            erKey: "philhealthEmployerContribution",
+            lookup: getPhilHealthContributions,
+            monthToDate: false,
+        }),
+        forRun({
+            basisKey: "pagibigContributionBasis",
+            overwriteKey: "pagibigOverwriteAmount",
+            eeKey: "pagibigContribution",
+            erKey: "pagibigEmployerContribution",
+            lookup: getPagIbigContributions,
+            monthToDate: false,
+        }),
+    ]);
 
     return {
-        employee: r2(totalPremium * employeeShare),
-        employer: r2(totalPremium * (1 - employeeShare)),
+        sssContribution: sss.employee,
+        sssEmployerContribution: sss.employer,
+        philhealthContribution: philhealth.employee,
+        philhealthEmployerContribution: philhealth.employer,
+        pagibigContribution: pagibig.employee,
+        pagibigEmployerContribution: pagibig.employer,
     };
 }
 

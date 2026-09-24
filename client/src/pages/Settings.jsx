@@ -4,6 +4,8 @@ import { toast } from "react-toastify";
 import { FiEdit2, FiPlus, FiTrash2, FiX } from "react-icons/fi";
 import customFetch from "../../utils/customFetch";
 import { Overlay, useConfirm } from "../components";
+import { philhealthMonthly, philhealthPerRun } from "@shared/philhealthPremium";
+import { runsPerMonth } from "@shared/contributionFactor";
 
 export const loader = async () => {
     try {
@@ -199,6 +201,201 @@ const SettingsModal = ({
     </Overlay>
 );
 
+// ─── PhilHealth calculator ────────────────────────────────────────────────────
+
+const PERIOD_OPTIONS = [
+    { value: "monthly", label: "Monthly", run: "per month", unit: "month" },
+    { value: "semi-monthly", label: "Semi-monthly", run: "per cutoff", unit: "cutoff" },
+    { value: "daily", label: "Daily (paid semi-monthly)", run: "per cutoff", unit: "cutoff" },
+    { value: "weekly", label: "Weekly", run: "per week", unit: "week" },
+];
+
+const CalcResult = ({ label, value, strong }) => (
+    <div className="rounded-lg border border-slate-200 bg-white px-4 py-3">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-slate-400">
+            {label}
+        </p>
+        <p
+            className={`mt-1 tabular-nums ${strong ? "text-xl font-bold text-slate-900" : "text-lg font-semibold text-slate-700"}`}
+        >
+            {value}
+        </p>
+    </div>
+);
+
+// Works a salary through the same arithmetic payroll uses
+// (@shared/philhealthPremium), on the rate rows above, so what it shows is
+// exactly what a payroll would deduct.
+const PhilHealthCalculator = ({ rates }) => {
+    const years = [...rates].sort((a, b) => b.year - a.year);
+    const thisYear = new Date().getFullYear();
+    const [salary, setSalary] = useState("");
+    const [year, setYear] = useState(
+        String((years.find((r) => r.year === thisYear) ?? years[0])?.year ?? ""),
+    );
+    const [membership, setMembership] = useState("employed");
+    const [period, setPeriod] = useState("semi-monthly");
+
+    const rate = years.find((r) => String(r.year) === year) ?? years[0] ?? null;
+    const amount = Number(salary);
+    const ready = Boolean(rate) && salary !== "" && amount >= 0;
+
+    const monthly = ready ? philhealthMonthly(rate, amount) : null;
+    const runs = runsPerMonth(period);
+    const perRun = monthly ? philhealthPerRun(monthly, period, 1 / runs) : null;
+    const employed = membership === "employed";
+    const option = PERIOD_OPTIONS.find((o) => o.value === period);
+
+    let boundNote = null;
+    if (monthly && amount < monthly.base)
+        boundNote = `Below the ${fmt(monthly.base)} salary floor, so it is computed on the floor.`;
+    else if (monthly && amount > monthly.base)
+        boundNote = `Above the ${fmt(monthly.base)} salary ceiling, so it is computed on the ceiling.`;
+
+    const raw = monthly ? monthly.base * rate.premiumRate : 0;
+
+    return (
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+            <div className="px-5 py-3 border-b border-slate-100">
+                <p className="text-sm font-semibold text-slate-700">
+                    PhilHealth Contribution Calculator
+                </p>
+                <p className="text-xs text-slate-400 mt-0.5">
+                    Uses the rates above and the same computation as payroll.
+                </p>
+            </div>
+
+            <div className="p-5 flex flex-col gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <Field label="Monthly Basic Salary">
+                        <NumInput
+                            name="calcSalary"
+                            value={salary}
+                            onChange={(e) => setSalary(e.target.value)}
+                            placeholder="15000"
+                            prefix="₱"
+                        />
+                    </Field>
+                    <Field label="Year">
+                        <select
+                            value={year}
+                            onChange={(e) => setYear(e.target.value)}
+                            className={inputCls}
+                        >
+                            {years.map((r) => (
+                                <option key={r._id} value={r.year}>
+                                    {r.year}
+                                </option>
+                            ))}
+                        </select>
+                    </Field>
+                    <Field label="Membership">
+                        <select
+                            value={membership}
+                            onChange={(e) => setMembership(e.target.value)}
+                            className={inputCls}
+                        >
+                            <option value="employed">Employed</option>
+                            <option value="self">
+                                Self-employed / Individually paying
+                            </option>
+                        </select>
+                    </Field>
+                    {employed && (
+                        <Field label="Pay Period">
+                            <select
+                                value={period}
+                                onChange={(e) => setPeriod(e.target.value)}
+                                className={inputCls}
+                            >
+                                {PERIOD_OPTIONS.map((o) => (
+                                    <option key={o.value} value={o.value}>
+                                        {o.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </Field>
+                    )}
+                </div>
+
+                {!rate && (
+                    <p className="text-sm text-slate-400">
+                        Add a PhilHealth rate first.
+                    </p>
+                )}
+
+                {monthly && (
+                    <>
+                        <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-2">
+                                Per month
+                            </p>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                                <CalcResult
+                                    label="Total Premium"
+                                    value={fmt(monthly.premium)}
+                                    strong
+                                />
+                                <CalcResult
+                                    label="Employee Share"
+                                    value={fmt(employed ? monthly.employee : monthly.premium)}
+                                />
+                                <CalcResult
+                                    label="Employer Share"
+                                    value={employed ? fmt(monthly.employer) : "Not applicable"}
+                                />
+                            </div>
+                        </div>
+
+                        {employed && (
+                            <div>
+                                <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-2">
+                                    Payroll deduction {option.run}
+                                </p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                    <CalcResult
+                                        label="Employee"
+                                        value={fmt(perRun.employee)}
+                                        strong
+                                    />
+                                    <CalcResult
+                                        label="Employer"
+                                        value={fmt(perRun.employer)}
+                                    />
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="rounded-lg bg-slate-50 border border-slate-200 px-4 py-3 text-sm text-slate-600 flex flex-col gap-1">
+                            <p>
+                                {fmt(monthly.base)} × {pct(rate.premiumRate)} = {fmt(raw)}
+                                {Math.abs(raw - monthly.premium) > 0.004 &&
+                                    ` → held at ${fmt(monthly.premium)} (premium range ${fmt(monthly.minimumPremium)} – ${fmt(monthly.maximumPremium)})`}
+                            </p>
+                            {boundNote && <p>{boundNote}</p>}
+                            {employed ? (
+                                <p>
+                                    Split {pct(rate.employeeShare)} employee /{" "}
+                                    {pct(1 - rate.employeeShare)} employer. Each{" "}
+                                    {option.unit} deducts the full share.
+                                </p>
+                            ) : (
+                                <p>A self-employed member pays the whole premium.</p>
+                            )}
+                            {employed && period !== "monthly" && (
+                                <p className="text-xs text-slate-400">
+                                    In payroll, the salary above is the {option.unit}
+                                    {"'"}s basic pay × {runs}.
+                                </p>
+                            )}
+                        </div>
+                    </>
+                )}
+            </div>
+        </div>
+    );
+};
+
 // ─── PhilHealth tab ───────────────────────────────────────────────────────────
 
 const emptyPH = () => ({
@@ -207,6 +404,8 @@ const emptyPH = () => ({
     employeeShare: "",
     minimumSalaryThreshold: "",
     deductionCeiling: "",
+    minimumPremium: "",
+    maximumPremium: "",
 });
 
 const PhilHealthTab = ({ rates, onChanged }) => {
@@ -226,6 +425,8 @@ const PhilHealthTab = ({ rates, onChanged }) => {
             employeeShare: r.employeeShare,
             minimumSalaryThreshold: r.minimumSalaryThreshold,
             deductionCeiling: r.deductionCeiling ?? "",
+            minimumPremium: r.minimumPremium ?? "",
+            maximumPremium: r.maximumPremium ?? "",
         });
         setAdding(false);
     };
@@ -247,6 +448,12 @@ const PhilHealthTab = ({ rates, onChanged }) => {
                 minimumSalaryThreshold: Number(form.minimumSalaryThreshold),
                 ...(form.deductionCeiling !== "" && {
                     deductionCeiling: Number(form.deductionCeiling),
+                }),
+                ...(form.minimumPremium !== "" && {
+                    minimumPremium: Number(form.minimumPremium),
+                }),
+                ...(form.maximumPremium !== "" && {
+                    maximumPremium: Number(form.maximumPremium),
                 }),
             };
             if (editId) {
@@ -318,6 +525,9 @@ const PhilHealthTab = ({ rates, onChanged }) => {
                                     Ceiling
                                 </th>
                                 <th className="px-5 py-2.5 text-right">
+                                    Monthly Premium
+                                </th>
+                                <th className="px-5 py-2.5 text-right">
                                     EE Contribution*
                                 </th>
                                 <th className="px-5 py-2.5"></th>
@@ -327,7 +537,7 @@ const PhilHealthTab = ({ rates, onChanged }) => {
                             {rates.length === 0 && (
                                 <tr>
                                     <td
-                                        colSpan={7}
+                                        colSpan={8}
                                         className="px-5 py-6 text-center text-slate-400 text-xs"
                                     >
                                         No rates yet.
@@ -351,6 +561,11 @@ const PhilHealthTab = ({ rates, onChanged }) => {
                                     <td className="px-5 py-3 text-right text-slate-600">
                                         {r.deductionCeiling
                                             ? fmt(r.deductionCeiling)
+                                            : "—"}
+                                    </td>
+                                    <td className="px-5 py-3 text-right text-slate-600 whitespace-nowrap">
+                                        {r.minimumPremium && r.maximumPremium
+                                            ? `${fmt(r.minimumPremium)} – ${fmt(r.maximumPremium)}`
                                             : "—"}
                                     </td>
                                     <td className="px-5 py-3 text-right font-medium text-slate-800">
@@ -387,6 +602,8 @@ const PhilHealthTab = ({ rates, onChanged }) => {
                     2.5% of salary)
                 </p>
             </div>
+
+            <PhilHealthCalculator rates={rates} />
 
             <SettingsModal
                 open={adding || !!editId}
@@ -448,13 +665,40 @@ const PhilHealthTab = ({ rates, onChanged }) => {
                                 prefix="₱"
                             />
                         </Field>
-                        <Field label="Ceiling (optional)">
+                        <Field label="Ceiling">
                             <NumInput
                                 name="deductionCeiling"
                                 value={form.deductionCeiling}
                                 onChange={set("deductionCeiling")}
                                 placeholder="100000"
                                 step="1"
+                                prefix="₱"
+                            />
+                        </Field>
+                    </div>
+                </div>
+
+                <div>
+                    <SectionHead
+                        title="Monthly premium"
+                        note="Total premium for employee and employer together. It never goes below the minimum or above the maximum."
+                    />
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <Field label="Minimum Premium">
+                            <NumInput
+                                name="minimumPremium"
+                                value={form.minimumPremium}
+                                onChange={set("minimumPremium")}
+                                placeholder="500"
+                                prefix="₱"
+                            />
+                        </Field>
+                        <Field label="Maximum Premium">
+                            <NumInput
+                                name="maximumPremium"
+                                value={form.maximumPremium}
+                                onChange={set("maximumPremium")}
+                                placeholder="5000"
                                 prefix="₱"
                             />
                         </Field>
@@ -471,8 +715,9 @@ const PhilHealthTab = ({ rates, onChanged }) => {
                                 Number(form.employeeShare || 0),
                         )}{" "}
                         of salary from the employee
-                        {form.minimumSalaryThreshold !== "" &&
-                            ` — ${fmt(Number(form.minimumSalaryThreshold) * Number(form.premiumRate || 0) * Number(form.employeeShare || 0))} a month at the minimum salary`}
+                        {form.minimumPremium !== "" &&
+                            form.maximumPremium !== "" &&
+                            ` — ${fmt(Number(form.minimumPremium) * Number(form.employeeShare || 0))} to ${fmt(Number(form.maximumPremium) * Number(form.employeeShare || 0))} a month`}
                     </p>
                 </div>
             </SettingsModal>
