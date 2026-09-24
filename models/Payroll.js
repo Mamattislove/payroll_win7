@@ -91,6 +91,12 @@ const payrollSchema = new mongoose.Schema(
         // silently restate money that has already been disbursed.
         locked: { type: Boolean, default: false },
 
+        // Set when someone keys the government contributions in by hand. The
+        // totals are recomputed whenever a record is attached or attendance is
+        // re-keyed, and without this the rate tables would quietly overwrite
+        // the figures the user just saved.
+        contributionsOverridden: { type: Boolean, default: false },
+
         createdBy: { type: ObjectId, ref: "User" },
     },
     { timestamps: true },

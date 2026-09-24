@@ -40,6 +40,9 @@ async function recomputeGrossBasisContributions(
         pagibigEmployerContribution: payroll.pagibigEmployerContribution,
     };
 
+    // Figures keyed in by hand on the edit screen win over the rate tables.
+    if (payroll.contributionsOverridden) return stored;
+
     const compensation = await Compensation.findById(
         payroll.compensation,
     ).lean();

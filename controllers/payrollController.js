@@ -881,9 +881,25 @@ export const batchCreatePayrolls = async (req, res) => {
     });
 };
 
+const CONTRIBUTION_FIELDS = [
+    "sssContribution",
+    "philhealthContribution",
+    "pagibigContribution",
+    "sssEmployerContribution",
+    "philhealthEmployerContribution",
+    "pagibigEmployerContribution",
+];
+
 export const updatePayroll = async (req, res) => {
     const payrollId = req.params.payrollId;
     const { earnings, allowances, deductions, charges, ...payrollFields } = req.body;
+
+    // Contributions sent here are a manual override. Flag them so the
+    // recompute below (and every later one) keeps them instead of restating
+    // them from the rate tables.
+    if (CONTRIBUTION_FIELDS.some((key) => key in payrollFields)) {
+        payrollFields.contributionsOverridden = true;
+    }
 
     const payroll = await Payroll.findByIdAndUpdate(payrollId, payrollFields, {
         new: true,

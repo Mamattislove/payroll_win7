@@ -49,8 +49,9 @@ const sharedOptionalFields = [
         .optional()
         .isISO8601()
         .withMessage("payroll to must be a valid date"),
+    // null is how the edit screen clears the date, so it must get past here.
     body("payrollDate")
-        .optional()
+        .optional({ values: "null" })
         .isISO8601()
         .withMessage("payroll date must be a valid date"),
     body("autoDeductDeductions").optional().isBoolean(),

@@ -48,7 +48,7 @@ const ErrorState = ({
             </p>
 
             {detail && (
-                <p className="mt-5 rounded-lg bg-slate-50 px-4 py-3 text-left font-mono text-xs break-words text-slate-500">
+                <p className="mt-5 rounded-lg bg-slate-50 px-4 py-3 text-left font-mono text-xs break-word text-slate-500">
                     {detail}
                 </p>
             )}

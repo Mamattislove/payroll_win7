@@ -33,8 +33,12 @@ const cutoffDateTo = (fromVal) => {
     const day = d.getUTCDate();
     const year = d.getUTCFullYear();
     const month = d.getUTCMonth();
-    if (day === 1) return new Date(Date.UTC(year, month, 15)).toISOString().slice(0, 10);
-    if (day === 16) return new Date(Date.UTC(year, month + 1, 0)).toISOString().slice(0, 10);
+    if (day === 1)
+        return new Date(Date.UTC(year, month, 15)).toISOString().slice(0, 10);
+    if (day === 16)
+        return new Date(Date.UTC(year, month + 1, 0))
+            .toISOString()
+            .slice(0, 10);
     return null;
 };
 
@@ -56,41 +60,66 @@ const EmployeeCombobox = ({ compensations, value, onChange }) => {
 
     const selected = compensations.find((c) => c._id === value);
 
-    const filtered = query.trim() === ""
-        ? compensations
-        : compensations.filter((c) => {
-            const name = employeeName(c).toLowerCase();
-            const code = (c.employeeDesignation?.employee?.employeeCode ?? "").toLowerCase();
-            const q = query.toLowerCase();
-            return name.includes(q) || code.includes(q);
-        });
+    const filtered =
+        query.trim() === ""
+            ? compensations
+            : compensations.filter((c) => {
+                  const name = employeeName(c).toLowerCase();
+                  const code = (
+                      c.employeeDesignation?.employee?.employeeCode ?? ""
+                  ).toLowerCase();
+                  const q = query.toLowerCase();
+                  return name.includes(q) || code.includes(q);
+              });
 
-    const handleSelect = (comp) => { onChange(comp._id); setQuery(""); setOpen(false); };
-    const handleClear = () => { onChange(""); setQuery(""); };
+    const handleSelect = (comp) => {
+        onChange(comp._id);
+        setQuery("");
+        setOpen(false);
+    };
+    const handleClear = () => {
+        onChange("");
+        setQuery("");
+    };
 
     useEffect(() => {
         const handler = (e) => {
-            if (containerRef.current && !containerRef.current.contains(e.target)) {
-                setOpen(false); setQuery("");
+            if (
+                containerRef.current &&
+                !containerRef.current.contains(e.target)
+            ) {
+                setOpen(false);
+                setQuery("");
             }
         };
         document.addEventListener("mousedown", handler);
         return () => document.removeEventListener("mousedown", handler);
     }, []);
 
-    const displayValue = open ? query : (selected ? employeeName(selected) : "");
+    const displayValue = open ? query : selected ? employeeName(selected) : "";
 
     return (
         <div ref={containerRef} className="relative w-full">
             <div className="relative">
-                <input type="text" value={displayValue}
-                    onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+                <input
+                    type="text"
+                    value={displayValue}
+                    onChange={(e) => {
+                        setQuery(e.target.value);
+                        setOpen(true);
+                    }}
                     onFocus={() => setOpen(true)}
                     placeholder="Search employee…"
-                    className={`${inputCls} pr-8`} autoComplete="off" />
+                    className={`${inputCls} pr-8`}
+                    autoComplete="off"
+                />
                 {selected && !open && (
-                    <button type="button" onClick={handleClear}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600" title="Clear">
+                    <button
+                        type="button"
+                        onClick={handleClear}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                        title="Clear"
+                    >
                         <FiX size={14} />
                     </button>
                 )}
@@ -98,19 +127,33 @@ const EmployeeCombobox = ({ compensations, value, onChange }) => {
             {open && (
                 <div className="absolute z-20 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                     {filtered.length === 0 ? (
-                        <p className="px-3 py-2.5 text-sm text-slate-400">No employees found.</p>
-                    ) : filtered.map((c) => {
-                        const code = c.employeeDesignation?.employee?.employeeCode;
-                        return (
-                            <button key={c._id} type="button"
-                                onMouseDown={(e) => e.preventDefault()}
-                                onClick={() => handleSelect(c)}
-                                className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between gap-2 hover:bg-slate-50 ${value === c._id ? "bg-slate-50 font-semibold" : ""}`}>
-                                <span className="text-slate-800 truncate">{employeeName(c)}</span>
-                                {code && <span className="text-slate-400 text-xs shrink-0">{code}</span>}
-                            </button>
-                        );
-                    })}
+                        <p className="px-3 py-2.5 text-sm text-slate-400">
+                            No employees found.
+                        </p>
+                    ) : (
+                        filtered.map((c) => {
+                            const code =
+                                c.employeeDesignation?.employee?.employeeCode;
+                            return (
+                                <button
+                                    key={c._id}
+                                    type="button"
+                                    onMouseDown={(e) => e.preventDefault()}
+                                    onClick={() => handleSelect(c)}
+                                    className={`w-full text-left px-3 py-2 text-sm flex items-center justify-between gap-2 hover:bg-slate-50 ${value === c._id ? "bg-slate-50 font-semibold" : ""}`}
+                                >
+                                    <span className="text-slate-800 truncate">
+                                        {employeeName(c)}
+                                    </span>
+                                    {code && (
+                                        <span className="text-slate-400 text-xs shrink-0">
+                                            {code}
+                                        </span>
+                                    )}
+                                </button>
+                            );
+                        })
+                    )}
                 </div>
             )}
         </div>
@@ -130,7 +173,8 @@ const AddPayroll = () => {
 
     const set = (k) => (e) => setForm((p) => ({ ...p, [k]: e.target.value }));
 
-    const selected = compensations.find((c) => c._id === form.compensation) || null;
+    const selected =
+        compensations.find((c) => c._id === form.compensation) || null;
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -166,9 +210,12 @@ const AddPayroll = () => {
                     ← Back
                 </button>
                 <div>
-                    <h1 className="text-2xl font-bold text-slate-800">Process Payroll</h1>
+                    <h1 className="text-2xl font-bold text-slate-800">
+                        Process Payroll
+                    </h1>
                     <p className="text-slate-500 text-sm mt-0.5">
-                        Computes attendance-based pay and auto-attaches standing records for the period.
+                        Computes attendance-based pay and auto-attaches standing
+                        records for the period.
                     </p>
                 </div>
             </div>
@@ -181,23 +228,35 @@ const AddPayroll = () => {
                     </p>
 
                     <div>
-                        <label className={labelCls}>Employee / Compensation</label>
+                        <label className={labelCls}>
+                            Employee / Compensation
+                        </label>
                         <EmployeeCombobox
                             compensations={compensations}
                             value={form.compensation}
-                            onChange={(val) => setForm((p) => ({ ...p, compensation: val }))}
+                            onChange={(val) =>
+                                setForm((p) => ({ ...p, compensation: val }))
+                            }
                         />
                     </div>
 
                     {selected && (
                         <div className="grid grid-cols-2 gap-3 text-sm bg-slate-50 rounded-lg px-4 py-3 border border-slate-100">
                             <div>
-                                <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-0.5">Daily Rate</p>
-                                <p className="font-medium text-slate-800">{fmt(selected.dailyRate)}</p>
+                                <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-0.5">
+                                    Daily Rate
+                                </p>
+                                <p className="font-medium text-slate-800">
+                                    {fmt(selected.dailyRate)}
+                                </p>
                             </div>
                             <div>
-                                <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-0.5">Monthly Rate</p>
-                                <p className="font-medium text-slate-800">{fmt(selected.monthlyRate)}</p>
+                                <p className="text-[10px] uppercase tracking-widest text-slate-400 mb-0.5">
+                                    Monthly Rate
+                                </p>
+                                <p className="font-medium text-slate-800">
+                                    {fmt(selected.monthlyRate)}
+                                </p>
                             </div>
                         </div>
                     )}
