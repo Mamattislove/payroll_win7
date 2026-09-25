@@ -26,7 +26,10 @@ import {
     recomputeLaterRunsThisMonth,
 } from "../utils/recomputePayroll.js";
 import { syncPayrollAttendance } from "../utils/syncPayrollAttendance.js";
-import { computeContributionsForRun } from "../utils/computeGovContributions.js";
+import {
+    computeContributionsForRun,
+    contributionGross,
+} from "../utils/computeGovContributions.js";
 
 const r2 = (n) => Math.round(n * 100) / 100;
 
@@ -535,16 +538,13 @@ async function generatePayrollFor(
     } = computePayroll(attendances, dailyRate);
 
     const periodPay = {
-        // Earnings and allowances are attached below, after the payroll exists,
-        // so the gross known here is attendance pay only. recomputePayrollTotals
-        // restates a "gross pay" employee's contributions once they are on.
-        periodGross:
-            regularPay +
-            regularOtPay +
-            holidayRestDayPay +
-            holidayRestDayOtPay +
-            nightDiffPay +
-            leavePay,
+        // The "gross pay" contributions use: basic plus all overtime (see
+        // contributionGross).
+        periodGross: contributionGross({
+            regularPay,
+            regularOTPay: regularOtPay,
+            holidayRestDayOTPay: holidayRestDayOtPay,
+        }),
         // "Basic pay" is the regular pay actually earned this period -- the
         // same figure the payroll journal prints under BASIC PAY.
         periodBasic: regularPay,

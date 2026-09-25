@@ -5,6 +5,7 @@ import Payroll from "../models/Payroll.js";
 import { SSS_CONTRIBUTION_BASIS } from "./constants.js";
 import { contributionFactor, runsPerMonth } from "./contributionFactor.js";
 import { philhealthMonthly, philhealthPerRun } from "./philhealthPremium.js";
+import { pagibigPerRun } from "./pagibigContribution.js";
 
 const r2 = (n) => Math.round(n * 100) / 100;
 
@@ -13,6 +14,20 @@ const r2 = (n) => Math.round(n * 100) / 100;
 // before the bracket is looked up. One constant, one place to correct it.
 const SIL_DAYS_PER_YEAR = 5;
 const MONTHS_PER_YEAR = 12;
+
+/**
+ * The "gross pay" a contribution basis of that name is indexed by: basic pay
+ * plus all overtime. HR's rule -- holiday and rest day pay, night
+ * differential, leave pay, earnings and allowances do not count, even though
+ * they are in the payslip's gross.
+ */
+export function contributionGross(p) {
+    return r2(
+        (p.regularPay ?? 0) +
+            (p.regularOTPay ?? 0) +
+            (p.holidayRestDayOTPay ?? 0),
+    );
+}
 
 /**
  * The monthly wage the contribution table is indexed by, for one basis.
@@ -26,9 +41,11 @@ const MONTHS_PER_YEAR = 12;
  *                same number the payroll journal prints as BASIC PAY
  *                (`p.regularPay`), which is what "basic pay" means everywhere
  *                else people read it.
- *   periodGross  everything earned: basic plus overtime, holiday and rest day
- *                pay, night differential, leave pay, earnings and allowances
- *                -- derivePayrollTotals' grossPay.
+ *   periodGross  the "gross pay" contributions are indexed by: basic pay
+ *                plus all overtime (regular OT and holiday / rest day OT) --
+ *                contributionGross. Narrower than the payslip's grossPay,
+ *                which also carries holiday pay, night differential, leave,
+ *                earnings and allowances.
  *
  * Either one falls back to the standing monthlyRate when it is not available,
  * which happens when contributions are worked out before a payroll exists.
@@ -143,23 +160,39 @@ async function getPhilHealthContributions(wage, year) {
 }
 
 /**
+ * Pag-IBIG for one payroll run: the office's computePagibigContri on this
+ * run's own pay, with the cap, threshold and rates from the year's row (see
+ * utils/pagibigContribution.js).
+ */
+async function getPagIbigForRun(pay, year, payrollPeriod) {
+    let rate = await PagIbigRate.findOne({ year });
+    if (!rate) rate = await PagIbigRate.findOne().sort({ year: -1 });
+    if (!rate) {
+        console.warn(`[computeGovContributions] No Pag-IBIG rate found for year=${year}.`);
+        return { employee: 0, employer: 0 };
+    }
+    return pagibigPerRun(rate, pay, payrollPeriod);
+}
+
+/**
  * SSS, PhilHealth and Pag-IBIG for one payroll run, employee and employer.
  *
- * SSS is collected month-to-date, as the previous system did it:
+ * SSS is priced on each cutoff by itself: the cutoff's pay (basic, or basic
+ * plus all overtime for a "gross pay" basis) goes straight to the bracket, and
+ * that bracket's full employee and employer amounts come off the cutoff.
+ * Nothing is added across the cutoffs of a month.
  *
- *   first run of the month   the bracket for this run's pay alone
- *   later runs               the bracket for the month's pay so far, less
- *                            what the earlier runs already took
- *
- *   e.g. 7,343.16 then 7,266.67 -> 375 (MSC 7,500), then 725 (MSC 14,500) - 375
+ *   e.g. a cutoff of 8,472.49 -> MSC 8,500 -> EE 425, ER 850 + EC 10 = 860
  *
  * PhilHealth and Pag-IBIG are priced per cutoff: this run's pay is scaled up to
  * a month (x1 monthly, x2 semi-monthly and daily, x4 weekly -- bracketWage) and
- * the monthly contribution is looked up on that. Pag-IBIG then deducts its
- * share of the month (half a semi-monthly month, a quarter of a weekly one --
- * contributionFactor). PhilHealth deducts the whole share on every run (see
- * philhealthPerRun): the salary held between the floor and ceiling, times the
- * rate, split by the employee share -- all from the rate table.
+ * the monthly contribution is looked up on that. Pag-IBIG follows the office's
+ * computePagibigContri on the run's own pay (see getPagIbigForRun): the salary
+ * cap divided by the runs, 1% or 2%, times 2, paid by the employee and the
+ * employer alike. PhilHealth follows the office's ComputePhilhealthContri
+ * (see philhealthPerRun): the run's pay held between the floor and ceiling
+ * divided by the runs in a month, times the rate, split between employee and
+ * employer by the employee share -- all from the rate table.
  *
  * `payrollId` is the run being priced when it already exists, so it is not
  * counted as one of its own earlier runs.
@@ -179,7 +212,7 @@ export async function computeContributionsForRun(
         ...(payrollId && { _id: { $ne: payrollId } }),
     })
         .select(
-            "regularPay grossPay " +
+            "regularPay regularOTPay holidayRestDayOTPay " +
                 "sssContribution sssEmployerContribution " +
                 "philhealthContribution philhealthEmployerContribution " +
                 "pagibigContribution pagibigEmployerContribution",
@@ -191,7 +224,8 @@ export async function computeContributionsForRun(
     // The month's pay so far on a given basis. Nothing is scaled: the runs are
     // added up rather than one of them multiplied out.
     const monthBasic = total("regularPay") + periodBasic;
-    const monthGross = total("grossPay") + periodGross;
+    const monthGross =
+        earlier.reduce((s, p) => s + contributionGross(p), 0) + periodGross;
     const wageFor = (basis) => {
         let wage;
         switch (basis) {
@@ -222,6 +256,7 @@ export async function computeContributionsForRun(
         lookup,
         monthToDate,
         perRun,
+        runLookup,
     }) => {
         const basis = compensation[basisKey] || SSS_CONTRIBUTION_BASIS.BASIC_PAY;
         if (basis === SSS_CONTRIBUTION_BASIS.NO_DEDUCTION)
@@ -232,6 +267,22 @@ export async function computeContributionsForRun(
         const overwrite = compensation[overwriteKey] ?? 0;
         if (overwrite > 0)
             return { employee: r2(overwrite * factor), employer: 0 };
+
+        // Priced on this run's own pay (Pag-IBIG): bracketWage scales the run
+        // to a month -- or falls back to the monthly rate when nothing was
+        // earned -- so dividing by the runs gives the run's pay back.
+        if (runLookup) {
+            const runs = runsPerMonth(compensation.payrollPeriod);
+            const { employee, employer } = await runLookup(
+                r2(
+                    bracketWage(basis, compensation, periodGross, periodBasic) /
+                        runs,
+                ),
+                year,
+                compensation.payrollPeriod,
+            );
+            return { employee, employer };
+        }
 
         // Per cutoff: this run scaled to a month, and the run's share of it.
         if (!monthToDate) {
@@ -283,8 +334,10 @@ export async function computeContributionsForRun(
             overwriteKey: "sssOverwriteAmount",
             eeKey: "sssContribution",
             erKey: "sssEmployerContribution",
-            lookup: getSSSContributions,
-            monthToDate: true,
+            // Each cutoff on its own: its pay straight to the bracket, and the
+            // bracket's full amount deducted -- nothing added across cutoffs.
+            runLookup: (pay, year) => getSSSContributions(pay, year),
+            monthToDate: false,
         }),
         forRun({
             basisKey: "philhealthContributionBasis",
@@ -300,7 +353,7 @@ export async function computeContributionsForRun(
             overwriteKey: "pagibigOverwriteAmount",
             eeKey: "pagibigContribution",
             erKey: "pagibigEmployerContribution",
-            lookup: getPagIbigContributions,
+            runLookup: getPagIbigForRun,
             monthToDate: false,
         }),
     ]);

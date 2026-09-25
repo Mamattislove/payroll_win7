@@ -39,28 +39,55 @@ export function philhealthMonthly(rate, monthlySalary) {
     return {
         base: r2(base),
         premium: r2(premium),
+        // Unrounded, so a run's share is cut from the exact figure.
+        rawPremium: premium,
+        employeeShare,
+        // The premium at the salary floor (10,000 x 5% = 500), which HR's
+        // per-run minimum is half of.
+        floorPremium: floor * premiumRate,
         employee: r2(premium * employeeShare),
         employer: r2(premium * (1 - employeeShare)),
     };
 }
 
 /**
- * What one payroll run deducts for PhilHealth.
+ * What one payroll run deducts for PhilHealth -- the office's
+ * ComputePhilhealthContri:
  *
- * The run's basic pay has already been multiplied up to a month by the pay
- * period (x1 monthly, x2 semi-monthly and daily, x4 weekly -- bracketWage),
- * and `monthly` is the share on that. Each run deducts that whole share, as
- * the office computes it: a semi-monthly cutoff of 6,122.72 is 12,245.44 a
- * month, 12,245.44 x 5% / 2 = 306.14, and 306.14 comes off that cutoff.
+ *   floor and ceiling divided by the runs in a month
+ *     (semi-monthly and daily / 2, weekly / 4, monthly / 1)
+ *   the run's basic pay held between them, times the rate (5%)
+ *   that premium is split by the employee share (half each at 0.5)
  *
- * `payrollPeriod` and `factor` are kept in the signature for the callers; the
- * share is not divided across the runs.
+ * HR's rule then holds each share to a minimum: half the premium at the
+ * salary floor (10,000 x 5% / 2 = 250) per monthly, semi-monthly or daily
+ * run, and half that (125) per weekly run.
+ *
+ * e.g. a semi-monthly cutoff of 6,122.72: floor 5,000, ceiling 50,000,
+ * 6,122.72 x 5% = 306.14, half is 153.07, lifted to the 250 minimum -- so 250
+ * from the employee and 250 from the employer.
+ *
+ * `monthly` is philhealthMonthly on the run's pay multiplied up to a month
+ * (bracketWage), so its premium over the runs is the same figure: holding
+ * pay x n between the floor and ceiling and dividing by n is holding pay
+ * between floor / n and ceiling / n.
  */
-// eslint-disable-next-line no-unused-vars
-export function philhealthPerRun(monthly, payrollPeriod, factor) {
+export function philhealthPerRun(monthly, payrollPeriod) {
+    const runs = runsPerMonth(payrollPeriod);
+    const premium = monthly.rawPremium / runs;
+    const share = monthly.employeeShare ?? 0.5;
+
+    // HR minimum per share: 250 a run for monthly, semi-monthly and daily;
+    // a weekly run is half a cutoff, so 125.
+    const scale = Math.min(1, 2 / runs);
+    const minEmployee = r2(monthly.floorPremium * share * scale);
+    const minEmployer = r2(monthly.floorPremium * (1 - share) * scale);
+
     return {
-        employee: r2(monthly.employee),
-        employer: r2(monthly.employer),
-        runs: runsPerMonth(payrollPeriod),
+        premium: r2(premium),
+        employee: Math.max(r2(premium * share), minEmployee),
+        employer: Math.max(r2(premium * (1 - share)), minEmployer),
+        minEmployee,
+        runs,
     };
 }

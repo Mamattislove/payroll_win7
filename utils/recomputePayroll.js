@@ -7,7 +7,10 @@ import LoanPayment from "../models/LoanPayment.js";
 import ChargeRecord from "../models/ChargeRecord.js";
 import Compensation from "../models/Compensation.js";
 import { derivePayrollTotals } from "./payrollTotals.js";
-import { computeContributionsForRun } from "./computeGovContributions.js";
+import {
+    computeContributionsForRun,
+    contributionGross,
+} from "./computeGovContributions.js";
 
 const sum = (records) => records.reduce((acc, r) => acc + (r.amount ?? 0), 0);
 
@@ -24,11 +27,7 @@ const sum = (records) => records.reduce((acc, r) => acc + (r.amount ?? 0), 0);
  * allowances), so computing them from the gross and then feeding them back into
  * the deduction side is not circular.
  */
-async function recomputeGrossBasisContributions(
-    payroll,
-    earningsTotal,
-    allowancesTotal,
-) {
+async function recomputeGrossBasisContributions(payroll) {
     const stored = {
         sssContribution: payroll.sssContribution,
         philhealthContribution: payroll.philhealthContribution,
@@ -52,15 +51,9 @@ async function recomputeGrossBasisContributions(
     // unconditional -- the old guard only restated "gross pay" employees and
     // would have left a basic-pay employee quoting contributions from the
     // attendance they had before the correction.
-    const periodGross =
-        (payroll.regularPay ?? 0) +
-        (payroll.regularOTPay ?? 0) +
-        (payroll.holidayRestDayPay ?? 0) +
-        (payroll.holidayRestDayOTPay ?? 0) +
-        (payroll.nightDifferentialPay ?? 0) +
-        (payroll.leavePay ?? 0) +
-        earningsTotal +
-        allowancesTotal;
+    // The "gross pay" contributions use: basic plus all overtime. Earnings and
+    // allowances are part of the payslip's gross but not of this one.
+    const periodGross = contributionGross(payroll);
 
     // Month-to-date and already sized for this run. Both halves of each
     // contribution are restated together: they come out of one bracket, and
@@ -121,11 +114,7 @@ export async function recomputePayrollTotals(payrollId, { cascade = true } = {})
     // standing monthly rate and are left as computed at creation, so this
     // cannot quietly restate a historical payroll whose rate table has since
     // been edited.
-    const contributions = await recomputeGrossBasisContributions(
-        payroll,
-        sum(earnings),
-        sum(allowances),
-    );
+    const contributions = await recomputeGrossBasisContributions(payroll);
 
     const { grossPay, totalDeductions, netSalary, finalPay } =
         derivePayrollTotals({

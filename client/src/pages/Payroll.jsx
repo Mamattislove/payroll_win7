@@ -481,7 +481,9 @@ const DeductionSection = ({
 
     // Same rule as savings: one payment per deduction record per payroll.
     const linkedRecordIds = new Set(
-        records.map((r) => r.deductionRecord?._id ?? r.deductionRecord).filter(Boolean),
+        records
+            .map((r) => r.deductionRecord?._id ?? r.deductionRecord)
+            .filter(Boolean),
     );
     const availableRecords = existingRecords.filter(
         (rec) => !linkedRecordIds.has(rec._id),

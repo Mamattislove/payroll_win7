@@ -237,20 +237,30 @@ const PhilHealthCalculator = ({ rates }) => {
     const [period, setPeriod] = useState("semi-monthly");
 
     const rate = years.find((r) => String(r.year) === year) ?? years[0] ?? null;
+    const employed = membership === "employed";
+    // A self-employed member is priced on the month as a whole.
+    const runPeriod = employed ? period : "monthly";
+    const option = PERIOD_OPTIONS.find((o) => o.value === runPeriod);
+    const runs = runsPerMonth(runPeriod);
+
     const amount = Number(salary);
     const ready = Boolean(rate) && salary !== "" && amount >= 0;
 
-    const monthly = ready ? philhealthMonthly(rate, amount) : null;
-    const runs = runsPerMonth(period);
-    const perRun = monthly ? philhealthPerRun(monthly, period, 1 / runs) : null;
-    const employed = membership === "employed";
-    const option = PERIOD_OPTIONS.find((o) => o.value === period);
+    // Same path as payroll: the pay multiplied up to a month, then the run's
+    // part of that premium (philhealthPerRun) -- which is the office's
+    // ComputePhilhealthContri on the pay itself.
+    const monthly = ready ? philhealthMonthly(rate, amount * runs) : null;
+    const perRun = monthly ? philhealthPerRun(monthly, runPeriod) : null;
+
+    const floorRef = rate ? (rate.minimumSalaryThreshold || 10000) / runs : 0;
+    const ceilingRef = rate ? (rate.deductionCeiling || 100000) / runs : 0;
+    const heldPay = monthly ? monthly.base / runs : 0;
 
     let boundNote = null;
-    if (monthly && amount < monthly.base)
-        boundNote = `Below the ${fmt(monthly.base)} salary floor, so it is computed on the floor.`;
-    else if (monthly && amount > monthly.base)
-        boundNote = `Above the ${fmt(monthly.base)} salary ceiling, so it is computed on the ceiling.`;
+    if (monthly && amount < heldPay)
+        boundNote = `Below the ${fmt(floorRef)} floor, so it is computed on the floor.`;
+    else if (monthly && amount > heldPay)
+        boundNote = `Above the ${fmt(ceilingRef)} ceiling, so it is computed on the ceiling.`;
 
     return (
         <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
@@ -265,12 +275,12 @@ const PhilHealthCalculator = ({ rates }) => {
 
             <div className="p-5 flex flex-col gap-5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                    <Field label="Monthly Basic Salary">
+                    <Field label={`Basic Pay ${option.run}`}>
                         <NumInput
                             name="calcSalary"
                             value={salary}
                             onChange={(e) => setSalary(e.target.value)}
-                            placeholder="15000"
+                            placeholder={String(15000 / runs)}
                             prefix="₱"
                         />
                     </Field>
@@ -322,67 +332,56 @@ const PhilHealthCalculator = ({ rates }) => {
                     </p>
                 )}
 
-                {monthly && (
+                {perRun && (
                     <>
                         <div>
                             <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-2">
-                                Per month
+                                {employed
+                                    ? `Payroll deduction ${option.run}`
+                                    : "Contribution per month"}
                             </p>
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                 <CalcResult
-                                    label="Total Premium"
-                                    value={fmt(monthly.premium)}
+                                    label="Premium"
+                                    value={fmt(perRun.premium)}
+                                />
+                                <CalcResult
+                                    label={employed ? "Employee" : "Member pays"}
+                                    value={fmt(
+                                        employed ? perRun.employee : perRun.premium,
+                                    )}
                                     strong
                                 />
                                 <CalcResult
-                                    label="Employee Share"
-                                    value={fmt(employed ? monthly.employee : monthly.premium)}
-                                />
-                                <CalcResult
-                                    label="Employer Share"
-                                    value={employed ? fmt(monthly.employer) : "Not applicable"}
+                                    label="Employer"
+                                    value={
+                                        employed
+                                            ? fmt(perRun.employer)
+                                            : "Not applicable"
+                                    }
                                 />
                             </div>
                         </div>
 
-                        {employed && (
-                            <div>
-                                <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400 mb-2">
-                                    Payroll deduction {option.run}
-                                </p>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <CalcResult
-                                        label="Employee"
-                                        value={fmt(perRun.employee)}
-                                        strong
-                                    />
-                                    <CalcResult
-                                        label="Employer"
-                                        value={fmt(perRun.employer)}
-                                    />
-                                </div>
-                            </div>
-                        )}
-
                         <div className="rounded-lg bg-slate-50 border border-slate-200 px-4 py-3 text-sm text-slate-600 flex flex-col gap-1">
                             <p>
-                                {fmt(monthly.base)} × {pct(rate.premiumRate)} ={" "}
-                                {fmt(monthly.premium)}
+                                Floor {fmt(floorRef)} · Ceiling {fmt(ceilingRef)}
+                                {runs > 1 &&
+                                    ` (${fmt(floorRef * runs)} and ${fmt(ceilingRef * runs)} ÷ ${runs})`}
+                            </p>
+                            <p>
+                                {fmt(heldPay)} × {pct(rate.premiumRate)} ={" "}
+                                {fmt(perRun.premium)}
                             </p>
                             {boundNote && <p>{boundNote}</p>}
-                            {employed ? (
+                            {employed && (
                                 <p>
-                                    Split {pct(rate.employeeShare)} employee /{" "}
-                                    {pct(1 - rate.employeeShare)} employer. Each{" "}
-                                    {option.unit} deducts the full share.
-                                </p>
-                            ) : (
-                                <p>A self-employed member pays the whole premium.</p>
-                            )}
-                            {employed && period !== "monthly" && (
-                                <p className="text-xs text-slate-400">
-                                    In payroll, the salary above is the {option.unit}
-                                    {"'"}s basic pay × {runs}.
+                                    Split {pct(rate.employeeShare)} /{" "}
+                                    {pct(1 - rate.employeeShare)}, each share at
+                                    least {fmt(perRun.minEmployee)} per{" "}
+                                    {option.unit}: the employee pays{" "}
+                                    {fmt(perRun.employee)} and the employer{" "}
+                                    {fmt(perRun.employer)}.
                                 </p>
                             )}
                         </div>
