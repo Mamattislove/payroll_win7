@@ -130,7 +130,8 @@ export const validatePayrollInput = withValidationErrors([
         .isISO8601()
         .withMessage("payroll to must be a valid date"),
     body("payrollDate")
-        .optional()
+        .notEmpty()
+        .withMessage("payroll date is required")
         .isISO8601()
         .withMessage("payroll date must be a valid date"),
     body("autoDeductDeductions").optional().isBoolean(),

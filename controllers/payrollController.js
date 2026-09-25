@@ -824,6 +824,7 @@ export const batchCreatePayrolls = async (req, res) => {
     const { payrollFrom, payrollTo, payrollDate, compensations = [] } = req.body;
     if (!payrollFrom || !payrollTo)
         throw new BadRequestError("payrollFrom and payrollTo are required");
+    if (!payrollDate) throw new BadRequestError("payroll date is required");
     if (!Array.isArray(compensations) || compensations.length === 0)
         throw new BadRequestError("select at least one employee to generate");
 
@@ -855,7 +856,7 @@ export const batchCreatePayrolls = async (req, res) => {
             const payroll = await generatePayrollFor(compensation, {
                 payrollFrom,
                 payrollTo,
-                payrollFields: payrollDate ? { payrollDate } : {},
+                payrollFields: { payrollDate },
             });
             created.push(payroll._id);
         } catch (error) {

@@ -19,6 +19,9 @@
 //   a year whose rate is not an even split, if one is ever entered
 //
 // Usage:  node seeders/equalizePhilHealthEmployerShare.js [--apply]
+//                [--uri mongodb://127.0.0.1:27017/payroll]
+// Without --uri it uses MONGO_URL from the repo's .env; the target is printed
+// before anything is read or written.
 // Without --apply it only reports what it would change.
 
 import path from "node:path";
@@ -32,6 +35,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 dotenv.config({ path: path.join(ROOT, ".env") });
 
 const APPLY = process.argv.includes("--apply");
+const uriArg = process.argv.indexOf("--uri");
+const URI = uriArg > -1 ? process.argv[uriArg + 1] : process.env.MONGO_URL;
 
 const unequal = {
     $expr: {
@@ -50,11 +55,18 @@ const unequal = {
 };
 
 async function run() {
-    if (!process.env.MONGO_URL)
+    if (!URI)
         throw new Error(
-            `MONGO_URL is not set — expected it in ${path.join(ROOT, ".env")}`,
+            `No database URI. Set MONGO_URL in ${path.join(ROOT, ".env")} or pass --uri`,
         );
-    await mongoose.connect(process.env.MONGO_URL);
+    const shown = URI.replace(/\/\/[^@]*@/, "//***@");
+    console.log(`target: ${shown}`);
+    console.log(
+        /localhost|127\.0\.0\.1/.test(URI)
+            ? "        (local database)\n"
+            : "        (NOT localhost — this is a remote database)\n",
+    );
+    await mongoose.connect(URI);
     console.log(APPLY ? "APPLYING changes\n" : "DRY RUN — nothing written\n");
 
     // Years whose premium is split evenly. A payroll in any other year is left

@@ -1569,7 +1569,7 @@ const ProcessPayrollModal = ({ onClose, onDone }) => {
                 compensation: selectedComp?._id,
                 payrollFrom: form.payrollFrom,
                 payrollTo: form.payrollTo,
-                ...(form.payrollDate && { payrollDate: form.payrollDate }),
+                payrollDate: form.payrollDate,
             });
             toast.success("Payroll processed");
             onDone();
@@ -1662,6 +1662,7 @@ const ProcessPayrollModal = ({ onClose, onDone }) => {
                             type="date"
                             value={form.payrollDate}
                             onChange={set("payrollDate")}
+                            required
                             className={inputCls}
                         />
                     </Field>

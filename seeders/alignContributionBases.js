@@ -14,6 +14,9 @@
 // gross-pay clients; the report lists them so that can be checked.
 //
 // Usage:  node seeders/alignContributionBases.js [--apply] [--keep-no-deduction]
+//                [--uri mongodb://127.0.0.1:27017/payroll]
+// Without --uri it uses MONGO_URL from the repo's .env; the target is printed
+// before anything is read or written.
 //
 //   --apply              write the changes; without it this only reports
 //   --keep-no-deduction  leave a compensation whose SSS or Pag-IBIG basis is
@@ -36,6 +39,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 dotenv.config({ path: path.join(ROOT, ".env") });
 
 const APPLY = process.argv.includes("--apply");
+const uriArg = process.argv.indexOf("--uri");
+const URI = uriArg > -1 ? process.argv[uriArg + 1] : process.env.MONGO_URL;
 const KEEP_NO_DEDUCTION = process.argv.includes("--keep-no-deduction");
 
 const { BASIC_PAY, GROSS_PAY, NO_DEDUCTION } = SSS_CONTRIBUTION_BASIS;
@@ -73,11 +78,18 @@ const onSchedule = (clientName) =>
     );
 
 async function run() {
-    if (!process.env.MONGO_URL)
+    if (!URI)
         throw new Error(
-            `MONGO_URL is not set — expected it in ${path.join(ROOT, ".env")}`,
+            `No database URI. Set MONGO_URL in ${path.join(ROOT, ".env")} or pass --uri`,
         );
-    await mongoose.connect(process.env.MONGO_URL);
+    const shown = URI.replace(/\/\/[^@]*@/, "//***@");
+    console.log(`target: ${shown}`);
+    console.log(
+        /localhost|127\.0\.0\.1/.test(URI)
+            ? "        (local database)\n"
+            : "        (NOT localhost — this is a remote database)\n",
+    );
+    await mongoose.connect(URI);
     console.log(APPLY ? "APPLYING changes\n" : "DRY RUN — nothing written\n");
 
     const [compensations, designations, clients] = await Promise.all([
@@ -202,3 +214,12 @@ try {
 } finally {
     await mongoose.disconnect();
 }
+
+// node seeders/seedContributionRates.js --uri mongodb://127.0.0.1:27017/payroll
+// node seeders/seedContributionRates.js --uri mongodb://127.0.0.1:27017/payroll --apply
+
+// node seeders/alignContributionBases.js --uri mongodb://127.0.0.1:27017/payroll
+// node seeders/alignContributionBases.js --uri mongodb://127.0.0.1:27017/payroll --apply
+
+// node seeders/equalizePhilHealthEmployerShare.js --uri mongodb://127.0.0.1:27017/payroll
+// node seeders/equalizePhilHealthEmployerShare.js --uri mongodb://127.0.0.1:27017/payroll --apply

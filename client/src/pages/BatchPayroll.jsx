@@ -154,7 +154,7 @@ const BatchPayroll = () => {
             const { data } = await customFetch.post("/payrolls/batch", {
                 payrollFrom: filter.payrollFrom,
                 payrollTo: filter.payrollTo,
-                ...(filter.payrollDate && { payrollDate: filter.payrollDate }),
+                payrollDate: filter.payrollDate,
                 compensations: [...selected],
             });
             setResult(data);
@@ -419,11 +419,20 @@ const BatchPayroll = () => {
                         <p className="text-sm text-slate-500">
                             <FiCheck className="inline mb-0.5 mr-1" size={14} />
                             {selected.size} of {selectable.length} selected
+                            {!filter.payrollDate && (
+                                <span className="ml-2 text-amber-600">
+                                    Set the payroll date above before generating.
+                                </span>
+                            )}
                         </p>
                         <button
                             type="button"
                             onClick={generate}
-                            disabled={generating || selected.size === 0}
+                            disabled={
+                                generating ||
+                                selected.size === 0 ||
+                                !filter.payrollDate
+                            }
                             className="flex items-center justify-center gap-2 px-5 py-2.5 text-sm text-white bg-slate-900 rounded-lg hover:bg-slate-700 transition-colors disabled:opacity-50"
                         >
                             <FiPlay size={14} />
